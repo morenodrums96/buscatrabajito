@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { SignOutButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 
 export default async function Dashboard() {
@@ -16,6 +17,11 @@ export default async function Dashboard() {
         <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
           Tu perfil está activo — revisamos nuevas vacantes cada 30 minutos.
         </div>
+        <SignOutButton redirectUrl="/">
+          <button className="mt-6 px-5 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
+            Cerrar sesión
+          </button>
+        </SignOutButton>
       </div>
     </main>
   );

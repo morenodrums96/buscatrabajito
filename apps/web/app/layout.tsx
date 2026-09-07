@@ -36,7 +36,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: "#2563EB",
+          colorBackground: "#ffffff",
+          colorForeground: "#0F2744",
+          borderRadius: "10px",
+          fontFamily: "Inter, sans-serif",
+        },
+      }}
+    >
       <html lang="es" className={`${plusJakarta.variable} ${inter.variable} ${greatVibes.variable}`}>
         <body>{children}</body>
       </html>

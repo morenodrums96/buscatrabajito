@@ -1,3 +1,5 @@
+"use client";
+
 const STEPS = [
   {
     num: "01",
@@ -51,31 +53,33 @@ export default function HowItWorks() {
         <div
           style={{
             textAlign: "center",
-            marginBottom: "76px",
+            marginBottom: "64px",
           }}
         >
-          <p
+          <span
             style={{
-              margin: "0 0 12px",
+              display: "inline-block",
+              padding: "5px 14px",
+              borderRadius: "999px",
+              background: "rgba(37, 99, 235, 0.08)",
               color: "#2563EB",
               fontSize: "12px",
               fontWeight: 700,
-              letterSpacing: "1.5px",
+              letterSpacing: "1px",
               textTransform: "uppercase",
               fontFamily: "var(--font-inter), sans-serif",
+              marginBottom: "16px",
             }}
           >
-            Así de fácil
-          </p>
+            Paso a paso
+          </span>
 
           <h2
             style={{
-              fontFamily:
-                "var(--font-plus-jakarta), sans-serif",
+              fontFamily: "var(--font-plus-jakarta), sans-serif",
               fontWeight: 800,
-              fontSize:
-                "clamp(30px, 4vw, 44px)",
-              lineHeight: 1.1,
+              fontSize: "clamp(30px, 4vw, 42px)",
+              lineHeight: 1.15,
               letterSpacing: "-1.5px",
               color: "#0F2744",
               margin: "0 0 14px",
@@ -91,166 +95,157 @@ export default function HowItWorks() {
               lineHeight: 1.6,
               maxWidth: "540px",
               margin: "0 auto",
-              fontFamily:
-                "var(--font-inter), sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
             }}
           >
-            Configura tu búsqueda una vez y deja que
-            BuscaTrabajito haga el trabajo pesado.
+            Configura tu búsqueda una vez y deja que BuscoTrabajito haga el
+            trabajo pesado.
           </p>
         </div>
 
-        {/* PROCESS */}
+        {/* PROCESS GRID */}
         <div
+          className="steps-grid"
           style={{
-            position: "relative",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "24px",
           }}
         >
-          {/* Línea horizontal desktop */}
-          <div
-            className="process-line"
-            style={{
-              position: "absolute",
-              top: "25px",
-              left: "8%",
-              right: "8%",
-              height: "1px",
-              background: "#CBD5E1",
-              zIndex: 0,
-            }}
-          />
-
-          <div
-            className="steps-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(3, 1fr)",
-              columnGap: "70px",
-              rowGap: "70px",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {STEPS.map((step) => (
-              <div
-                key={step.num}
-                style={{
-                  position: "relative",
-                }}
-              >
-                {/* Número */}
+          {STEPS.map((step) => (
+            <div
+              key={step.num}
+              style={{
+                position: "relative",
+                background: step.featured ? "#FFFFFF" : "#FFFFFF",
+                borderRadius: "16px",
+                padding: "32px 28px",
+                border: step.featured
+                  ? "2px solid #2563EB"
+                  : "1px solid #E2E8F0",
+                boxShadow: step.featured
+                  ? "0 12px 30px -8px rgba(37, 99, 235, 0.18)"
+                  : "0 4px 20px rgba(15, 39, 68, 0.03)",
+                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                if (!step.featured) {
+                  e.currentTarget.style.borderColor = "#CBD5E1";
+                  e.currentTarget.style.boxShadow =
+                    "0 12px 28px rgba(15, 39, 68, 0.07)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                if (!step.featured) {
+                  e.currentTarget.style.borderColor = "#E2E8F0";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 20px rgba(15, 39, 68, 0.03)";
+                }
+              }}
+            >
+              <div>
+                {/* Header Card: Número e indicador opcional */}
                 <div
                   style={{
-                    width: "50px",
-                    height: "50px",
-                    borderRadius: "50%",
-
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-
-                    background: step.featured
-                      ? "#2563EB"
-                      : "#FFFFFF",
-
-                    border: step.featured
-                      ? "none"
-                      : "1px solid #CBD5E1",
-
-                    color: step.featured
-                      ? "#FFFFFF"
-                      : "#2563EB",
-
-                    fontFamily:
-                      "var(--font-plus-jakarta), sans-serif",
-
-                    fontSize: "13px",
-                    fontWeight: 800,
-
-                    boxShadow:
-                      step.featured
-                        ? "0 8px 20px rgba(37,99,235,0.20)"
-                        : "0 2px 6px rgba(15,39,68,0.04)",
-
-                    marginBottom: "22px",
+                    justifyContent: "space-between",
+                    marginBottom: "20px",
                   }}
                 >
-                  {step.num}
-                </div>
-
-                {/* Content */}
-                <div
-                  style={{
-                    paddingRight: "10px",
-                  }}
-                >
-                  <h3
+                  <div
                     style={{
-                      fontFamily:
-                        "var(--font-plus-jakarta), sans-serif",
-
-                      fontWeight: 700,
-
-                      fontSize: "17px",
-
-                      color:
-                        step.featured
-                          ? "#2563EB"
-                          : "#0F2744",
-
-                      margin:
-                        "0 0 8px",
-
-                      letterSpacing:
-                        "-0.3px",
-                    }}
-                  >
-                    {step.title}
-                  </h3>
-
-                  <p
-                    style={{
-                      color: "#64748B",
+                      width: "42px",
+                      height: "42px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: step.featured ? "#2563EB" : "#F1F5F9",
+                      color: step.featured ? "#FFFFFF" : "#2563EB",
+                      fontFamily: "var(--font-plus-jakarta), sans-serif",
                       fontSize: "14px",
-                      lineHeight: 1.65,
-                      margin: 0,
-                      fontFamily:
-                        "var(--font-inter), sans-serif",
+                      fontWeight: 800,
                     }}
                   >
-                    {step.desc}
-                  </p>
+                    {step.num}
+                  </div>
+
+                  {step.featured && (
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "#2563EB",
+                        background: "rgba(37, 99, 235, 0.1)",
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      Automatizado
+                    </span>
+                  )}
                 </div>
+
+                {/* Título */}
+                <h3
+                  style={{
+                    fontFamily: "var(--font-plus-jakarta), sans-serif",
+                    fontWeight: 700,
+                    fontSize: "18px",
+                    color: "#0F2744",
+                    margin: "0 0 10px",
+                    letterSpacing: "-0.4px",
+                  }}
+                >
+                  {step.title}
+                </h3>
+
+                {/* Descripción */}
+                <p
+                  style={{
+                    color: "#64748B",
+                    fontSize: "14px",
+                    lineHeight: 1.6,
+                    margin: 0,
+                    fontFamily: "var(--font-inter), sans-serif",
+                  }}
+                >
+                  {step.desc}
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
 
-        {/* Bottom statement */}
+        {/* BOTTOM STATEMENT */}
         <div
           style={{
-            marginTop: "76px",
-            paddingTop: "30px",
-            borderTop:
-              "1px solid #E2E8F0",
+            marginTop: "64px",
+            padding: "24px 32px",
+            borderRadius: "16px",
+            background: "#FFFFFF",
+            border: "1px solid #E2E8F0",
             textAlign: "center",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.02)",
           }}
         >
           <p
             style={{
               margin: 0,
               color: "#475569",
-              fontSize: "14px",
-              fontFamily:
-                "var(--font-inter), sans-serif",
+              fontSize: "15px",
+              fontFamily: "var(--font-inter), sans-serif",
             }}
           >
-            <strong
-              style={{
-                color: "#0F2744",
-              }}
-            >
+            <strong style={{ color: "#0F2744", fontWeight: 700 }}>
               Tú no tienes que buscar todos los días.
             </strong>{" "}
             Nosotros lo hacemos por ti.
@@ -259,22 +254,14 @@ export default function HowItWorks() {
       </div>
 
       <style>{`
-        @media (max-width: 800px) {
-          .process-line {
-            display: none !important;
-          }
-
+        @media (max-width: 900px) {
           .steps-grid {
-            grid-template-columns: 1fr 1fr !important;
-            column-gap: 40px !important;
-            row-gap: 50px !important;
+            grid-template-columns: repeat(2, 1fr) !important;
           }
         }
-
-        @media (max-width: 540px) {
+        @media (max-width: 580px) {
           .steps-grid {
             grid-template-columns: 1fr !important;
-            row-gap: 42px !important;
           }
         }
       `}</style>

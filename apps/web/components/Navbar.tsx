@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
@@ -6,7 +7,9 @@ export default function Navbar() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
+
     window.addEventListener("scroll", onScroll, { passive: true });
+
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -14,40 +17,157 @@ export default function Navbar() {
     <header
       style={{
         position: "fixed",
-        top: 0, left: 0, right: 0,
+        top: 0,
+        left: 0,
+        right: 0,
         zIndex: 50,
         height: "68px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 40px",
-        background: scrolled ? "rgba(15, 39, 68, 0.94)" : "linear-gradient(to bottom, rgba(0,0,0,0.28), transparent)",
-        backdropFilter: scrolled ? "blur(12px)" : "none",
-        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-        boxShadow: scrolled ? "0 4px 24px rgba(0,0,0,0.12)" : "none",
-        transition: "background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease",
+        background: scrolled
+          ? "rgba(11, 23, 42, 0.85)"
+          : "linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        borderBottom: scrolled
+          ? "1px solid rgba(255,255,255,0.08)"
+          : "1px solid transparent",
+        boxShadow: scrolled
+          ? "0 4px 20px rgba(0, 0, 0, 0.25)"
+          : "none",
+        transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
-      <a href="/" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "21px", letterSpacing: "-0.7px", textDecoration: "none", color: "#FFFFFF" }}>
-        Busco<span style={{ color: "#60A5FA" }}>Trabajito</span>
+      {/* LOGO */}
+      <a
+        href="/"
+        style={{
+          fontFamily: "var(--font-plus-jakarta), sans-serif",
+          fontWeight: 800,
+          fontSize: "20px",
+          letterSpacing: "-0.5px",
+          textDecoration: "none",
+          color: "#FFFFFF",
+          display: "flex",
+          alignItems: "center",
+          gap: "2px",
+        }}
+      >
+        Busco
+        <span style={{ color: "#60A5FA" }}>Trabajito</span>
       </a>
 
-      <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+      {/* NAVIGATION */}
+      <nav
+        className="desktop-nav"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}
+      >
         {[
           { label: "Cómo funciona", href: "#como-funciona" },
           { label: "Precios", href: "#precios" },
         ].map(({ label, href }) => (
-          <a key={label} href={href}
-            style={{ color: "rgba(255,255,255,0.78)", fontSize: "13px", fontWeight: 600, padding: "8px 12px", borderRadius: "8px", textDecoration: "none", fontFamily: "var(--font-inter), sans-serif", transition: "color 0.2s ease, background 0.2s ease" }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#FFFFFF"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.78)"; e.currentTarget.style.background = "transparent"; }}
-          >{label}</a>
+          <a
+            key={label}
+            href={href}
+            style={{
+              color: "rgba(255, 255, 255, 0.72)",
+              fontSize: "13px",
+              fontWeight: 500,
+              padding: "8px 14px",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontFamily: "var(--font-inter), sans-serif",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#FFFFFF";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.72)";
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            {label}
+          </a>
         ))}
-        <a href="/sign-up"
-          style={{ marginLeft: "12px", background: "#2563EB", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, padding: "10px 18px", borderRadius: "8px", textDecoration: "none", fontFamily: "var(--font-plus-jakarta), sans-serif", boxShadow: "0 4px 14px rgba(37,99,235,0.30)", transition: "transform 0.2s ease, background 0.2s ease" }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#1D4ED8"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#2563EB"; e.currentTarget.style.transform = "translateY(0)"; }}
-        >Registrate</a>
+
+        {/* AUTH */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginLeft: "16px",
+            paddingLeft: "16px",
+            borderLeft: "1px solid rgba(255, 255, 255, 0.12)",
+          }}
+        >
+          {/* Iniciar sesión */}
+          <a
+            href="/sign-in"
+            style={{
+              color: "rgba(255, 255, 255, 0.85)",
+              fontSize: "13px",
+              fontWeight: 500,
+              padding: "8px 14px",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontFamily: "var(--font-inter), sans-serif",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#FFFFFF";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.85)";
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            Iniciar sesión
+          </a>
+
+          {/* Crear cuenta (Rediseñado: Subtle Glass / Border Accent) */}
+          <a
+            href="/sign-up"
+            style={{
+              background: "rgba(255, 255, 255, 0.06)",
+              color: "#FFFFFF",
+              fontSize: "13px",
+              fontWeight: 600,
+              padding: "8px 16px",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontFamily: "var(--font-plus-jakarta), sans-serif",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+              backdropFilter: "blur(8px)",
+              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.borderColor = "rgba(96, 165, 250, 0.5)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 12px rgba(96, 165, 250, 0.15)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.1)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Crear cuenta
+          </a>
+        </div>
       </nav>
     </header>
   );

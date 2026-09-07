@@ -1,3 +1,5 @@
+"use client";
+
 const PLANS = [
   {
     name: "Gratis",
@@ -67,47 +69,39 @@ export default function Pricing() {
           margin: "0 auto",
         }}
       >
-        {/* =====================================================
-            HEADER
-        ====================================================== */}
-
+        {/* HEADER */}
         <div
           style={{
             textAlign: "center",
             marginBottom: "64px",
           }}
         >
-          <p
+          <span
             style={{
-              margin: "0 0 12px",
+              display: "inline-block",
+              padding: "5px 14px",
+              borderRadius: "999px",
+              background: "rgba(37, 99, 235, 0.08)",
               color: "#2563EB",
               fontSize: "12px",
               fontWeight: 700,
-              letterSpacing: "1.5px",
+              letterSpacing: "1px",
               textTransform: "uppercase",
-              fontFamily:
-                "var(--font-inter), sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
+              marginBottom: "16px",
             }}
           >
             Sin complicaciones
-          </p>
+          </span>
 
           <h2
             style={{
-              fontFamily:
-                "var(--font-plus-jakarta), sans-serif",
-
+              fontFamily: "var(--font-plus-jakarta), sans-serif",
               fontWeight: 800,
-
-              fontSize:
-                "clamp(30px, 4vw, 44px)",
-
-              lineHeight: 1.1,
-
+              fontSize: "clamp(30px, 4vw, 42px)",
+              lineHeight: 1.15,
               letterSpacing: "-1.5px",
-
               color: "#0F2744",
-
               margin: "0 0 14px",
             }}
           >
@@ -117,38 +111,24 @@ export default function Pricing() {
           <p
             style={{
               color: "#64748B",
-
               fontSize: "16px",
-
               lineHeight: 1.6,
-
               maxWidth: "500px",
-
               margin: "0 auto",
-
-              fontFamily:
-                "var(--font-inter), sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
             }}
           >
-            Empieza gratis y actualiza cuando
-            necesites más herramientas.
+            Empieza gratis y actualiza cuando necesites más herramientas.
           </p>
         </div>
 
-        {/* =====================================================
-            PLANS
-        ====================================================== */}
-
+        {/* PLANS GRID */}
         <div
           className="pricing-grid"
           style={{
             display: "grid",
-
-            gridTemplateColumns:
-              "repeat(3, minmax(0, 1fr))",
-
-            gap: "20px",
-
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "24px",
             alignItems: "stretch",
           }}
         >
@@ -162,31 +142,20 @@ export default function Pricing() {
               }
               style={{
                 position: "relative",
-
                 display: "flex",
                 flexDirection: "column",
-
-                borderRadius: "18px",
-
-                padding: "32px",
-
-                background:
-                  plan.highlight
-                    ? "#F5F9FF"
-                    : "#FFFFFF",
-
-                border:
-                  plan.highlight
-                    ? "1.5px solid #2563EB"
-                    : "1px solid #E2E8F0",
-
-                boxShadow:
-                  plan.highlight
-                    ? "0 12px 35px rgba(37,99,235,0.10)"
-                    : "0 4px 18px rgba(15,39,68,0.035)",
-
-                transition:
-                  "transform 0.2s ease, box-shadow 0.2s ease",
+                borderRadius: "20px",
+                padding: "36px 30px",
+                background: plan.highlight
+                  ? "linear-gradient(180deg, #FFFFFF 0%, #F4F8FF 100%)"
+                  : "#FFFFFF",
+                border: plan.highlight
+                  ? "2px solid #2563EB"
+                  : "1px solid #E2E8F0",
+                boxShadow: plan.highlight
+                  ? "0 20px 40px -12px rgba(37, 99, 235, 0.18)"
+                  : "0 4px 20px rgba(15, 39, 68, 0.04)",
+                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             >
               {/* Popular badge */}
@@ -194,72 +163,46 @@ export default function Pricing() {
                 <div
                   style={{
                     position: "absolute",
-
-                    top: "-12px",
-                    left: "24px",
-
+                    top: "-14px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
                     display: "inline-flex",
                     alignItems: "center",
-
                     background: "#2563EB",
-
                     color: "#FFFFFF",
-
-                    padding: "5px 11px",
-
-                    borderRadius: "6px",
-
-                    fontFamily:
-                      "var(--font-inter), sans-serif",
-
-                    fontSize: "10px",
-
+                    padding: "6px 16px",
+                    borderRadius: "999px",
+                    fontFamily: "var(--font-inter), sans-serif",
+                    fontSize: "11px",
                     fontWeight: 700,
-
-                    letterSpacing: "0.7px",
+                    letterSpacing: "0.8px",
+                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                    textTransform: "uppercase",
                   }}
                 >
-                  MÁS POPULAR
+                  Más Popular
                 </div>
               )}
 
-              {/* =================================================
-                  PLAN NAME
-              ================================================== */}
-
-              <div
-                style={{
-                  marginBottom: "22px",
-                }}
-              >
-                <p
+              {/* PLAN NAME & SUBTITLE */}
+              <div style={{ marginBottom: "20px" }}>
+                <h3
                   style={{
-                    fontFamily:
-                      "var(--font-plus-jakarta), sans-serif",
-
+                    fontFamily: "var(--font-plus-jakarta), sans-serif",
                     fontWeight: 800,
-
-                    fontSize: "19px",
-
-                    color: plan.color,
-
-                    margin: "0 0 5px",
-
-                    letterSpacing: "-0.3px",
+                    fontSize: "20px",
+                    color: plan.highlight ? "#2563EB" : "#0F2744",
+                    margin: "0 0 4px",
+                    letterSpacing: "-0.4px",
                   }}
                 >
                   {plan.name}
-                </p>
-
+                </h3>
                 <p
                   style={{
-                    fontFamily:
-                      "var(--font-inter), sans-serif",
-
+                    fontFamily: "var(--font-inter), sans-serif",
                     color: "#64748B",
-
                     fontSize: "13px",
-
                     margin: 0,
                   }}
                 >
@@ -267,82 +210,51 @@ export default function Pricing() {
                 </p>
               </div>
 
-              {/* =================================================
-                  PRICE
-              ================================================== */}
-
+              {/* PRICE */}
               <div
                 style={{
                   display: "flex",
-
                   alignItems: "baseline",
-
-                  gap: "7px",
-
+                  gap: "6px",
                   paddingBottom: "24px",
-
-                  borderBottom:
-                    "1px solid #E2E8F0",
+                  borderBottom: "1px solid #E2E8F0",
                 }}
               >
                 <span
                   style={{
-                    fontFamily:
-                      "var(--font-plus-jakarta), sans-serif",
-
+                    fontFamily: "var(--font-plus-jakarta), sans-serif",
                     fontWeight: 800,
-
-                    fontSize:
-                      "clamp(36px, 4vw, 42px)",
-
+                    fontSize: "clamp(36px, 4vw, 44px)",
                     lineHeight: 1,
-
                     letterSpacing: "-1.5px",
-
                     color: "#0F2744",
                   }}
                 >
                   {plan.price}
                 </span>
-
                 <span
                   style={{
                     color: "#64748B",
-
-                    fontSize: "12px",
-
-                    fontFamily:
-                      "var(--font-inter), sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    fontFamily: "var(--font-inter), sans-serif",
                   }}
                 >
                   {plan.period}
                 </span>
               </div>
 
-              {/* =================================================
-                  FEATURES
-              ================================================== */}
-
-              <div
-                style={{
-                  flex: 1,
-
-                  paddingTop: "25px",
-                }}
-              >
+              {/* FEATURES */}
+              <div style={{ flex: 1, paddingTop: "24px" }}>
                 <p
                   style={{
-                    margin:
-                      "0 0 16px",
-
-                    color: "#475569",
-
+                    margin: "0 0 16px",
+                    color: "#0F2744",
                     fontSize: "12px",
-
-                    fontWeight: 600,
-
-                    fontFamily:
-                      "var(--font-inter), sans-serif",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                    textTransform: "uppercase",
+                    fontFamily: "var(--font-inter), sans-serif",
                   }}
                 >
                   Incluye:
@@ -351,137 +263,83 @@ export default function Pricing() {
                 <ul
                   style={{
                     listStyle: "none",
-
                     padding: 0,
-
-                    margin: 0,
+                    margin: "0 0 32px",
                   }}
                 >
-                  {plan.features.map(
-                    (feature) => (
-                      <li
-                        key={feature}
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "12px",
+                        marginBottom: "14px",
+                        color: "#334155",
+                        fontSize: "13px",
+                        lineHeight: 1.5,
+                        fontFamily: "var(--font-inter), sans-serif",
+                      }}
+                    >
+                      {/* Check Icon */}
+                      <span
                         style={{
+                          width: "20px",
+                          height: "20px",
+                          minWidth: "20px",
+                          borderRadius: "50%",
                           display: "flex",
-
-                          alignItems:
-                            "flex-start",
-
-                          gap: "10px",
-
-                          marginBottom: "14px",
-
-                          color: "#334155",
-
-                          fontSize: "13px",
-
-                          lineHeight: 1.5,
-
-                          fontFamily:
-                            "var(--font-inter), sans-serif",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: plan.highlight ? "#2563EB" : "#F1F5F9",
+                          color: plan.highlight ? "#FFFFFF" : "#2563EB",
+                          marginTop: "1px",
                         }}
                       >
-                        {/* Check */}
-                        <span
-                          style={{
-                            width: "18px",
-                            height: "18px",
-
-                            minWidth: "18px",
-
-                            borderRadius: "50%",
-
-                            display: "flex",
-
-                            alignItems:
-                              "center",
-
-                            justifyContent:
-                              "center",
-
-                            marginTop: "0px",
-
-                            background:
-                              plan.highlight
-                                ? "#DBEAFE"
-                                : "#F1F5F9",
-                          }}
+                        <svg
+                          viewBox="0 0 12 12"
+                          width="10"
+                          height="10"
+                          fill="none"
+                          aria-hidden="true"
                         >
-                          <svg
-                            viewBox="0 0 12 12"
-                            width="10"
-                            height="10"
-                            fill="none"
-                            aria-hidden="true"
-                          >
-                            <path
-                              d="M2 6l2.2 2.2L10 3.8"
-                              stroke={
-                                plan.highlight
-                                  ? "#2563EB"
-                                  : "#64748B"
-                              }
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </span>
+                          <path
+                            d="M2 6l2.2 2.2L10 3.8"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
 
-                        <span>
-                          {feature}
-                        </span>
-                      </li>
-                    )
-                  )}
+                      <span>{feature}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
-              {/* =================================================
-                  CTA
-              ================================================== */}
-
+              {/* CTA BUTTON */}
               <a
                 href={plan.href}
                 className="pricing-button"
                 style={{
-                  display: "block",
-
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   width: "100%",
-
-                  textAlign: "center",
-
-                  padding: "13px 16px",
-
-                  borderRadius: "9px",
-
-                  background:
-                    plan.highlight
-                      ? "#2563EB"
-                      : "transparent",
-
-                  color:
-                    plan.highlight
-                      ? "#FFFFFF"
-                      : plan.color,
-
-                  border:
-                    plan.highlight
-                      ? "1.5px solid #2563EB"
-                      : `1.5px solid ${plan.color}`,
-
+                  padding: "14px 20px",
+                  borderRadius: "12px",
+                  background: plan.highlight ? "#2563EB" : "#F8FAFC",
+                  color: plan.highlight ? "#FFFFFF" : "#0F2744",
+                  border: plan.highlight
+                    ? "none"
+                    : "1px solid #CBD5E1",
                   fontWeight: 700,
-
-                  fontSize: "13px",
-
+                  fontSize: "14px",
                   textDecoration: "none",
-
-                  fontFamily:
-                    "var(--font-plus-jakarta), sans-serif",
-
-                  transition:
-                    "background 0.2s ease, color 0.2s ease, transform 0.2s ease",
-
+                  fontFamily: "var(--font-plus-jakarta), sans-serif",
+                  transition: "all 0.2s ease",
                   boxSizing: "border-box",
                 }}
               >
@@ -491,47 +349,36 @@ export default function Pricing() {
           ))}
         </div>
 
-        {/* =====================================================
-            FOOTNOTE
-        ====================================================== */}
-
+        {/* FOOTNOTE */}
         <p
           style={{
             textAlign: "center",
-
-            margin:
-              "28px auto 0",
-
+            margin: "36px auto 0",
             color: "#94A3B8",
-
-            fontSize: "12px",
-
-            fontFamily:
-              "var(--font-inter), sans-serif",
+            fontSize: "13px",
+            fontFamily: "var(--font-inter), sans-serif",
           }}
         >
-          Puedes cambiar de plan o cancelar cuando quieras.
+          Puedes cambiar de plan o cancelar tu suscripción en cualquier momento.
         </p>
       </div>
 
-      {/* =======================================================
-          RESPONSIVE
-      ======================================================== */}
-
       <style>{`
         .pricing-card:hover {
-          transform: translateY(-3px);
-          box-shadow:
-            0 12px 30px rgba(15,39,68,0.08);
+          transform: translateY(-4px);
+        }
+
+        .pricing-card:not(.pricing-card-highlight):hover {
+          border-color: #CBD5E1 !important;
+          box-shadow: 0 12px 30px rgba(15, 39, 68, 0.08) !important;
         }
 
         .pricing-card-highlight:hover {
-          box-shadow:
-            0 16px 40px rgba(37,99,235,0.14);
+          box-shadow: 0 24px 48px -12px rgba(37, 99, 235, 0.25) !important;
         }
 
         .pricing-button:hover {
-          transform: translateY(-1px);
+          opacity: 0.95;
         }
 
         @media (max-width: 900px) {
