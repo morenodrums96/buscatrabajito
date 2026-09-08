@@ -1,19 +1,22 @@
 "use client";
 
+import Link from "next/link";
+import { Check, Sparkles, Zap, Flame } from "lucide-react";
+
 const PLANS = [
   {
     name: "Gratis",
-    subtitle: "Para empezar",
+    subtitle: "Para empezar a explorar",
     price: "$0",
     period: "para siempre",
-    color: "#64748B",
+    badge: null,
     features: [
       "Alertas por correo · máx. 3/día",
       "OCC y Computrabajo",
       "1 perfil de búsqueda activo",
       "Generador de CV con IA · 1 vez",
       "Descarga tu CV en PDF",
-      "Acceso al dashboard",
+      "Acceso al dashboard básico",
     ],
     cta: "Comenzar gratis",
     href: "/sign-up",
@@ -21,10 +24,10 @@ const PLANS = [
   },
   {
     name: "Buscador",
-    subtitle: "Para encontrar",
+    subtitle: "Para asegurar oportunidades",
     price: "$149",
     period: "MXN / mes",
-    color: "#2563EB",
+    badge: "Más Popular",
     features: [
       "Alertas por correo ilimitadas",
       "WhatsApp · máx. 30 mensajes/mes",
@@ -39,10 +42,10 @@ const PLANS = [
   },
   {
     name: "Aplicador",
-    subtitle: "Para aplicar",
+    subtitle: "Para el profesional activo",
     price: "$299",
     period: "MXN / mes",
-    color: "#0F2744",
+    badge: "Pro",
     features: [
       "Todo lo del plan Buscador",
       "WhatsApp · máx. 60 mensajes/mes",
@@ -59,355 +62,131 @@ const PLANS = [
 
 export default function Pricing() {
   return (
-    <section
-      id="precios"
-      style={{
-        background: "#FFFFFF",
-        padding: "110px 24px 120px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1080px",
-          margin: "0 auto",
-        }}
-      >
-        {/* HEADER */}
-        <div
+    <section id="precios" className="relative bg-[#060E1A] text-white py-24 px-6 overflow-hidden border-t border-slate-800/60">
+      {/* GLOWS Y FONDO DE RED */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
           style={{
-            textAlign: "center",
-            marginBottom: "64px",
+            backgroundImage: `radial-gradient(#38BDF8 1px, transparent 1px)`,
+            backgroundSize: `32px 32px`
           }}
-        >
-          <span
-            style={{
-              display: "inline-block",
-              padding: "5px 14px",
-              borderRadius: "999px",
-              background: "rgba(37, 99, 235, 0.08)",
-              color: "#2563EB",
-              fontSize: "12px",
-              fontWeight: 700,
-              letterSpacing: "1px",
-              textTransform: "uppercase",
-              fontFamily: "var(--font-inter), sans-serif",
-              marginBottom: "16px",
-            }}
-          >
+        />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-blue-600/10 blur-[150px] rounded-full" />
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto">
+        
+        {/* HEADER */}
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-bold tracking-wider uppercase mb-4">
+            <Zap className="w-3.5 h-3.5" />
             Sin complicaciones
           </span>
 
-          <h2
-            style={{
-              fontFamily: "var(--font-plus-jakarta), sans-serif",
-              fontWeight: 800,
-              fontSize: "clamp(30px, 4vw, 42px)",
-              lineHeight: 1.15,
-              letterSpacing: "-1.5px",
-              color: "#0F2744",
-              margin: "0 0 14px",
-            }}
-          >
-            Planes y precios
+          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-100 mb-4">
+            Planes y{" "}
+            <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-emerald-400 bg-clip-text text-transparent">
+              precios transparentes
+            </span>
           </h2>
 
-          <p
-            style={{
-              color: "#64748B",
-              fontSize: "16px",
-              lineHeight: 1.6,
-              maxWidth: "500px",
-              margin: "0 auto",
-              fontFamily: "var(--font-inter), sans-serif",
-            }}
-          >
-            Empieza gratis y actualiza cuando necesites más herramientas.
+          <p className="text-base sm:text-lg text-slate-400 font-normal leading-relaxed">
+            Empieza gratis y actualiza cuando necesites acelerar tu búsqueda laboral.
           </p>
         </div>
 
-        {/* PLANS GRID */}
-        <div
-          className="pricing-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: "24px",
-            alignItems: "stretch",
-          }}
-        >
+        {/* PRICING GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
-              className={
+              className={`relative rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 border ${
                 plan.highlight
-                  ? "pricing-card pricing-card-highlight"
-                  : "pricing-card"
-              }
-              style={{
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                borderRadius: "20px",
-                padding: "36px 30px",
-                background: plan.highlight
-                  ? "linear-gradient(180deg, #FFFFFF 0%, #F4F8FF 100%)"
-                  : "#FFFFFF",
-                border: plan.highlight
-                  ? "2px solid #2563EB"
-                  : "1px solid #E2E8F0",
-                boxShadow: plan.highlight
-                  ? "0 20px 40px -12px rgba(37, 99, 235, 0.18)"
-                  : "0 4px 20px rgba(15, 39, 68, 0.04)",
-                transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}
+                  ? "bg-gradient-to-b from-slate-900 via-[#0A1A30] to-slate-900 border-sky-500 shadow-2xl shadow-sky-950/60 lg:-translate-y-2"
+                  : "bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70"
+              }`}
             >
-              {/* Popular badge */}
+              {/* BADGE DESTACADO */}
               {plan.highlight && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-14px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    background: "#2563EB",
-                    color: "#FFFFFF",
-                    padding: "6px 16px",
-                    borderRadius: "999px",
-                    fontFamily: "var(--font-inter), sans-serif",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.8px",
-                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Más Popular
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3.5 py-1 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 text-white text-[11px] font-bold tracking-wider uppercase shadow-lg shadow-sky-500/30 border border-sky-300/30">
+                  <Flame className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                  {plan.badge}
                 </div>
               )}
 
-              {/* PLAN NAME & SUBTITLE */}
-              <div style={{ marginBottom: "20px" }}>
-                <h3
-                  style={{
-                    fontFamily: "var(--font-plus-jakarta), sans-serif",
-                    fontWeight: 800,
-                    fontSize: "20px",
-                    color: plan.highlight ? "#2563EB" : "#0F2744",
-                    margin: "0 0 4px",
-                    letterSpacing: "-0.4px",
-                  }}
-                >
-                  {plan.name}
-                </h3>
-                <p
-                  style={{
-                    fontFamily: "var(--font-inter), sans-serif",
-                    color: "#64748B",
-                    fontSize: "13px",
-                    margin: 0,
-                  }}
-                >
-                  {plan.subtitle}
-                </p>
-              </div>
-
-              {/* PRICE */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: "6px",
-                  paddingBottom: "24px",
-                  borderBottom: "1px solid #E2E8F0",
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: "var(--font-plus-jakarta), sans-serif",
-                    fontWeight: 800,
-                    fontSize: "clamp(36px, 4vw, 44px)",
-                    lineHeight: 1,
-                    letterSpacing: "-1.5px",
-                    color: "#0F2744",
-                  }}
-                >
-                  {plan.price}
-                </span>
-                <span
-                  style={{
-                    color: "#64748B",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    fontFamily: "var(--font-inter), sans-serif",
-                  }}
-                >
-                  {plan.period}
-                </span>
-              </div>
-
-              {/* FEATURES */}
-              <div style={{ flex: 1, paddingTop: "24px" }}>
-                <p
-                  style={{
-                    margin: "0 0 16px",
-                    color: "#0F2744",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    letterSpacing: "0.5px",
-                    textTransform: "uppercase",
-                    fontFamily: "var(--font-inter), sans-serif",
-                  }}
-                >
-                  Incluye:
-                </p>
-
-                <ul
-                  style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: "0 0 32px",
-                  }}
-                >
-                  {plan.features.map((feature) => (
-                    <li
-                      key={feature}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "12px",
-                        marginBottom: "14px",
-                        color: "#334155",
-                        fontSize: "13px",
-                        lineHeight: 1.5,
-                        fontFamily: "var(--font-inter), sans-serif",
-                      }}
-                    >
-                      {/* Check Icon */}
-                      <span
-                        style={{
-                          width: "20px",
-                          height: "20px",
-                          minWidth: "20px",
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: plan.highlight ? "#2563EB" : "#F1F5F9",
-                          color: plan.highlight ? "#FFFFFF" : "#2563EB",
-                          marginTop: "1px",
-                        }}
-                      >
-                        <svg
-                          viewBox="0 0 12 12"
-                          width="10"
-                          height="10"
-                          fill="none"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M2 6l2.2 2.2L10 3.8"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+              <div>
+                {/* TITULO & SUBTITULO */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className={`text-xl font-bold ${plan.highlight ? "text-sky-300" : "text-slate-100"}`}>
+                      {plan.name}
+                    </h3>
+                    {!plan.highlight && plan.badge && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        {plan.badge}
                       </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">{plan.subtitle}</p>
+                </div>
 
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                {/* PRECIO */}
+                <div className="flex items-baseline gap-2 pb-6 border-b border-slate-800">
+                  <span className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
+                    {plan.price}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {plan.period}
+                  </span>
+                </div>
+
+                {/* LISTA DE CARACTERISTICAS */}
+                <div className="pt-6 mb-8">
+                  <p className="text-[11px] font-bold tracking-wider uppercase text-slate-400 mb-4">
+                    Incluye:
+                  </p>
+                  <ul className="space-y-3.5">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3 text-xs text-slate-300 leading-relaxed">
+                        <span
+                          className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            plan.highlight
+                              ? "bg-sky-500/20 text-sky-400 border border-sky-400/30"
+                              : "bg-slate-800 text-emerald-400 border border-slate-700"
+                          }`}
+                        >
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
-              {/* CTA BUTTON */}
-              <a
+              {/* BOTON CTA */}
+              <Link
                 href={plan.href}
-                className="pricing-button"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "100%",
-                  padding: "14px 20px",
-                  borderRadius: "12px",
-                  background: plan.highlight ? "#2563EB" : "#F8FAFC",
-                  color: plan.highlight ? "#FFFFFF" : "#0F2744",
-                  border: plan.highlight
-                    ? "none"
-                    : "1px solid #CBD5E1",
-                  fontWeight: 700,
-                  fontSize: "14px",
-                  textDecoration: "none",
-                  fontFamily: "var(--font-plus-jakarta), sans-serif",
-                  transition: "all 0.2s ease",
-                  boxSizing: "border-box",
-                }}
+                className={`w-full py-3.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  plan.highlight
+                    ? "bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white shadow-lg shadow-sky-600/30 border border-sky-400/30"
+                    : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                }`}
               >
+                {plan.highlight && <Sparkles className="w-3.5 h-3.5 text-sky-200" />}
                 {plan.cta}
-              </a>
+              </Link>
             </div>
           ))}
         </div>
 
-        {/* FOOTNOTE */}
-        <p
-          style={{
-            textAlign: "center",
-            margin: "36px auto 0",
-            color: "#94A3B8",
-            fontSize: "13px",
-            fontFamily: "var(--font-inter), sans-serif",
-          }}
-        >
-          Puedes cambiar de plan o cancelar tu suscripción en cualquier momento.
+        {/* PIE DE PAGINA */}
+        <p className="text-center text-xs text-slate-500 mt-12">
+          Puedes cambiar de plan o cancelar tu suscripción en cualquier momento sin penalizaciones.
         </p>
+
       </div>
-
-      <style>{`
-        .pricing-card:hover {
-          transform: translateY(-4px);
-        }
-
-        .pricing-card:not(.pricing-card-highlight):hover {
-          border-color: #CBD5E1 !important;
-          box-shadow: 0 12px 30px rgba(15, 39, 68, 0.08) !important;
-        }
-
-        .pricing-card-highlight:hover {
-          box-shadow: 0 24px 48px -12px rgba(37, 99, 235, 0.25) !important;
-        }
-
-        .pricing-button:hover {
-          opacity: 0.95;
-        }
-
-        @media (max-width: 900px) {
-          .pricing-grid {
-            grid-template-columns: 1fr 1fr !important;
-          }
-
-          .pricing-card:last-child {
-            grid-column: 1 / -1;
-            max-width: 440px;
-            width: 100%;
-            margin: 0 auto;
-          }
-        }
-
-        @media (max-width: 620px) {
-          .pricing-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .pricing-card:last-child {
-            grid-column: auto;
-            max-width: none;
-          }
-        }
-      `}</style>
     </section>
   );
 }

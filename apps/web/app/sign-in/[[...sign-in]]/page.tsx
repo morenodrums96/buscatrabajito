@@ -1,19 +1,22 @@
 import { SignIn, ClerkLoading, ClerkLoaded } from "@clerk/nextjs";
 import Link from "next/link";
+import { ArrowLeft, Sparkles, CheckCircle2 } from "lucide-react";
 
 export default function Page() {
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#F8FAFC]">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[#040810] text-slate-100">
       {/* LADO IZQUIERDO: Panel Brand & Value */}
-      <div className="lg:col-span-5 bg-[#0F2744] text-white p-8 lg:p-12 flex flex-col justify-between relative overflow-hidden hidden sm:flex">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#2563EB]/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="lg:col-span-5 bg-[#060E1A] text-white p-8 lg:p-12 flex flex-col justify-between relative overflow-hidden hidden sm:flex border-r border-slate-800/80">
+        {/* Glows de fondo */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-72 h-72 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <Link
             href="/"
             className="inline-flex items-center text-xs font-semibold text-slate-300 hover:text-white transition-colors gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"
           >
-            ← Volver al sitio
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver al sitio
           </Link>
         </div>
 
@@ -21,74 +24,76 @@ export default function Page() {
           <Link
             href="/"
             className="font-extrabold text-3xl tracking-tight text-white mb-6 block"
-            style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
           >
-            Busco<span className="text-[#60A5FA]">Trabajito</span>
+            Busco<span className="text-sky-400">Trabajito</span>
           </Link>
 
-          <h1
-            className="text-3xl font-extrabold text-white leading-tight mb-4"
-            style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
-          >
+          <h1 className="text-3xl font-extrabold text-white leading-tight mb-4">
             Consigue tu próximo empleo sin estrés.
           </h1>
 
-          <p className="text-slate-300 text-sm leading-relaxed mb-8 max-w-sm">
+          <p className="text-slate-400 text-sm leading-relaxed mb-8 max-w-sm">
             Monitoreamos vacantes por ti, adaptamos tu CV con IA y te avisamos
             en tiempo real para que apliques antes que nadie.
           </p>
 
-          <div className="pt-6 border-t border-white/10 flex items-center gap-6">
-            <div>
-              <p className="text-xl font-extrabold text-white">7+</p>
-              <p className="text-xs text-slate-400">Portales rastreados</p>
+          <div className="space-y-3 pt-6 border-t border-slate-800/80">
+            <div className="flex items-center gap-2.5 text-xs text-slate-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>7+ portales rastreados en tiempo real</span>
             </div>
-            <div className="w-px h-8 bg-white/10" />
-            <div>
-              <p className="text-xl font-extrabold text-white">IA</p>
-              <p className="text-xs text-slate-400">Ajuste de CV</p>
+            <div className="flex items-center gap-2.5 text-xs text-slate-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>Optimización de CV inteligente por vacante</span>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 text-xs text-slate-400">
+        <div className="relative z-10 text-xs text-slate-500">
           © {new Date().getFullYear()} BuscoTrabajito. Todos los derechos reservados.
         </div>
       </div>
 
       {/* LADO DERECHO: Formulario / Loading de Clerk */}
-      <div className="lg:col-span-7 flex flex-col justify-center items-center p-6 lg:p-12 relative">
+      <div className="lg:col-span-7 flex flex-col justify-center items-center p-6 lg:p-12 relative bg-[#040810]">
         <Link
           href="/"
-          className="sm:hidden absolute top-6 left-6 text-xs font-semibold text-slate-500 hover:text-slate-800"
+          className="sm:hidden absolute top-6 left-6 text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5"
         >
-          ← Volver
+          <ArrowLeft className="w-3.5 h-3.5" /> Volver
         </Link>
 
         <div className="w-full max-w-md">
-          {/* Muestra un spinner o skeleton fino mientras inicializa el SDK de Clerk */}
+          {/* Skeleton mientras inicializa el SDK de Clerk */}
           <ClerkLoading>
-            <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-8 shadow-xl shadow-slate-900/5 animate-pulse flex flex-col items-center justify-center min-h-[400px]">
-              <div className="w-8 h-8 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin mb-4" />
+            <div className="w-full bg-[#0A1220] border border-slate-800 rounded-2xl p-8 shadow-2xl animate-pulse flex flex-col items-center justify-center min-h-[420px]">
+              <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-4" />
               <p className="text-xs font-medium text-slate-400">Cargando acceso seguro...</p>
             </div>
           </ClerkLoading>
 
-          {/* Renderiza el formulario nativo una vez cargado */}
+          {/* Formulario con estilos integrados */}
           <ClerkLoaded>
             <SignIn
               appearance={{
                 elements: {
-                  card: "bg-white shadow-xl shadow-slate-900/5 border border-slate-200/80 rounded-2xl p-6 sm:p-8 w-full",
-                  headerTitle: "text-[#0F2744] font-extrabold text-2xl tracking-tight",
-                  headerSubtitle: "text-[#64748B] text-sm",
+                  card: "bg-[#0A1220] shadow-2xl shadow-black/50 border border-slate-800 rounded-2xl p-6 sm:p-8 w-full",
+                  headerTitle: "text-white font-extrabold text-2xl tracking-tight",
+                  headerSubtitle: "text-slate-400 text-sm",
                   socialButtonsBlockButton:
-                    "border-slate-200 hover:bg-slate-50 text-[#0F2744] font-medium text-sm rounded-xl transition-all py-2.5",
+                    "bg-slate-900/80 border-slate-700/80 hover:bg-slate-800 text-slate-200 font-medium text-sm rounded-xl transition-all py-2.5",
+                  socialButtonsBlockButtonText: "text-slate-200 font-semibold",
+                  dividerLine: "bg-slate-800",
+                  dividerText: "text-slate-500 text-xs",
+                  formFieldLabel: "text-slate-300 text-xs font-medium",
                   formButtonPrimary:
-                    "bg-[#2563EB] hover:bg-[#1D4ED8] text-sm font-bold rounded-xl py-3 shadow-md shadow-blue-600/15 transition-all",
+                    "bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-sm font-bold rounded-xl py-3 shadow-md shadow-blue-500/20 transition-all",
                   formFieldInput:
-                    "rounded-xl border-slate-200 focus:border-[#2563EB] text-sm py-2.5",
-                  footerActionLink: "text-[#2563EB] hover:underline font-semibold",
+                    "bg-slate-950/60 border-slate-800 focus:border-sky-500 text-white text-sm rounded-xl py-2.5",
+                  footerActionLink: "text-sky-400 hover:text-sky-300 font-semibold",
+                  footerActionText: "text-slate-400",
+                  identityPreviewText: "text-slate-300",
+                  formFieldInputShowPasswordButton: "text-slate-400 hover:text-white",
                 },
               }}
             />

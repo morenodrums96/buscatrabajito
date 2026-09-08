@@ -1,154 +1,65 @@
 "use client";
 
 import Link from "next/link";
+import { Globe } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer
-      style={{
-        background: "#0F2744",
-        padding: "56px 24px 36px",
-        borderTop: "1px solid rgba(255, 255, 255, 0.08)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1080px",
-          margin: "0 auto",
-        }}
-      >
+    <footer className="relative bg-[#040810] text-slate-400 py-12 px-6 border-t border-slate-800/80">
+      <div className="max-w-6xl mx-auto">
         {/* TOP SECTION */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "24px",
-            paddingBottom: "36px",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          }}
-        >
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pb-8 border-b border-slate-800/80">
           {/* Logo */}
           <Link
             href="/"
-            style={{
-              fontFamily: "var(--font-plus-jakarta), sans-serif",
-              fontWeight: 800,
-              fontSize: "22px",
-              letterSpacing: "-0.7px",
-              textDecoration: "none",
-              color: "#FFFFFF",
-            }}
+            className="text-xl font-extrabold tracking-tight text-white transition-opacity hover:opacity-90"
           >
-            Busco<span style={{ color: "#60A5FA" }}>Trabajito</span>
+            Busco<span className="text-sky-400">Trabajito</span>
           </Link>
 
           {/* Navigation links */}
-          <nav
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "28px",
-              flexWrap: "wrap",
-            }}
-          >
+          <nav className="flex items-center gap-6 sm:gap-8 flex-wrap justify-center">
             <a
               href="#como-funciona"
-              className="footer-link"
-              style={{
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "14px",
-                textDecoration: "none",
-                fontFamily: "var(--font-inter), sans-serif",
-                transition: "color 0.2s ease",
-              }}
+              className="text-xs font-medium text-slate-400 hover:text-sky-400 transition-colors"
             >
               Cómo funciona
             </a>
             <a
               href="#precios"
-              className="footer-link"
-              style={{
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "14px",
-                textDecoration: "none",
-                fontFamily: "var(--font-inter), sans-serif",
-                transition: "color 0.2s ease",
-              }}
+              className="text-xs font-medium text-slate-400 hover:text-sky-400 transition-colors"
             >
               Precios
             </a>
-            <a
+            <Link
               href="/privacidad"
-              className="footer-link"
-              style={{
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "14px",
-                textDecoration: "none",
-                fontFamily: "var(--font-inter), sans-serif",
-                transition: "color 0.2s ease",
-              }}
+              className="text-xs font-medium text-slate-400 hover:text-sky-400 transition-colors"
             >
               Aviso de privacidad
-            </a>
-            <a
+            </Link>
+            <Link
               href="/terminos"
-              className="footer-link"
-              style={{
-                color: "rgba(255, 255, 255, 0.7)",
-                fontSize: "14px",
-                textDecoration: "none",
-                fontFamily: "var(--font-inter), sans-serif",
-                transition: "color 0.2s ease",
-              }}
+              className="text-xs font-medium text-slate-400 hover:text-sky-400 transition-colors"
             >
               Términos
-            </a>
+            </Link>
           </nav>
         </div>
 
         {/* BOTTOM BAR */}
-        <div
-          style={{
-            paddingTop: "28px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <p
-            style={{
-              color: "rgba(255, 255, 255, 0.45)",
-              fontSize: "13px",
-              margin: 0,
-              fontFamily: "var(--font-inter), sans-serif",
-            }}
-          >
+        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <p className="margin-0">
             © {currentYear} BuscoTrabajito. Todos los derechos reservados.
           </p>
 
-          <span
-            style={{
-              color: "rgba(255, 255, 255, 0.45)",
-              fontSize: "13px",
-              fontFamily: "var(--font-inter), sans-serif",
-            }}
-          >
-            México y LATAM 🇲🇽
-          </span>
+          <div className="flex items-center gap-1.5 text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800">
+            <Globe className="w-3.5 h-3.5 text-sky-400" />
+            <span>México y LATAM 🇲🇽</span>
+          </div>
         </div>
       </div>
-
-      <style>{`
-        .footer-link:hover {
-          color: #FFFFFF !important;
-        }
-      `}</style>
     </footer>
   );
 }
