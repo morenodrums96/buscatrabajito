@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   const { cvData } = await req.json();
 
-  const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
 
   const prompt = `Eres un experto en reclutamiento en México y LATAM. Analiza este perfil profesional y sugiere entre 4 y 6 puestos de trabajo a los que esta persona puede aplicar exitosamente.
 

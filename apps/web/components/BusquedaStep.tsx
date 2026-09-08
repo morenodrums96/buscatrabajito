@@ -2,18 +2,25 @@
 
 import { useEffect, useState } from "react";
 
-interface Perfil {
-  puesto: string;
-  ubicacion: string;
-  modalidad: string;
-  activo: boolean;
-}
+const ESTADOS = [
+  "Aguascalientes", "Baja California", "Baja California Sur", "Campeche",
+  "Chiapas", "Chihuahua", "Ciudad de México", "Coahuila", "Colima",
+  "Durango", "Estado de México", "Guanajuato", "Guerrero", "Hidalgo",
+  "Jalisco", "Michoacán", "Morelos", "Nayarit", "Nuevo León", "Oaxaca",
+  "Puebla", "Querétaro", "Quintana Roo", "San Luis Potosí", "Sinaloa",
+  "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala", "Veracruz", "Yucatán", "Zacatecas",
+];
 
-const MODALIDADES = ["Presencial", "Remoto", "Híbrido", "Cualquiera"];
+const MODALIDADES = ["Presencial", "Remoto", "Híbrido"];
 
 interface Props {
   cvData: Record<string, unknown> | null;
   onFinish: () => void;
+}
+
+interface Perfil {
+  puesto: string;
+  activo: boolean;
 }
 
 export default function BusquedaStep({ cvData, onFinish }: Props) {
@@ -21,6 +28,19 @@ export default function BusquedaStep({ cvData, onFinish }: Props) {
   const [cargando, setCargando] = useState(true);
   const [nuevoPuesto, setNuevoPuesto] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Configuración global
+  const [estadosSeleccionados, setEstadosSeleccionados] = useState<string[]>(["Nuevo León"]);
+  const [remotoUSA, setRemotoUSA] = useState(false);
+  const [modalidades, setModalidades] = useState<string[]>([]);
+
+  function toggleModalidad(m: string) {
+    setModalidades((prev) => {
+      const next = prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m];
+      if (next.length === 0) setRemotoUSA(false);
+      return next;
+    });
+  }
 
   useEffect(() => {
     fetch("/api/cv/sugerir-puestos", {
@@ -30,40 +50,43 @@ export default function BusquedaStep({ cvData, onFinish }: Props) {
     })
       .then((r) => r.json())
       .then((data) => {
-        const sugeridos = (data.puestos ?? []).map((p: string) => ({
-          puesto: p,
-          ubicacion: "Monterrey, NL",
-          modalidad: "Cualquiera",
-          activo: true,
-        }));
-        setPerfiles(sugeridos);
+        setPerfiles((data.puestos ?? []).map((p: string) => ({ puesto: p, activo: true })));
         setCargando(false);
       })
       .catch(() => setCargando(false));
   }, [cvData]);
 
-  function toggleActivo(i: number) {
-    setPerfiles((ps) => ps.map((p, idx) => idx === i ? { ...p, activo: !p.activo } : p));
+  function toggleEstado(estado: string) {
+    setEstadosSeleccionados((prev) =>
+      prev.includes(estado) ? prev.filter((e) => e !== estado) : [...prev, estado]
+    );
   }
 
-  function updatePerfil(i: number, field: keyof Perfil, value: string) {
-    setPerfiles((ps) => ps.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+  const todoMexico = estadosSeleccionados.length === ESTADOS.length;
+
+  function toggleTodoMexico() {
+    setEstadosSeleccionados(todoMexico ? [] : [...ESTADOS]);
+  }
+
+  function togglePerfil(i: number) {
+    setPerfiles((ps) => ps.map((p, idx) => idx === i ? { ...p, activo: !p.activo } : p));
   }
 
   function agregarPuesto() {
     if (!nuevoPuesto.trim()) return;
-    setPerfiles((ps) => [...ps, {
-      puesto: nuevoPuesto.trim(),
-      ubicacion: "Monterrey, NL",
-      modalidad: "Cualquiera",
-      activo: true,
-    }]);
+    setPerfiles((ps) => [...ps, { puesto: nuevoPuesto.trim(), activo: true }]);
     setNuevoPuesto("");
   }
 
   async function handleGuardar() {
     setSaving(true);
-    const activos = perfiles.filter((p) => p.activo);
+    const activos = perfiles.filter((p) => p.activo).map((p) => ({
+      puesto: p.puesto,
+      estados: estadosSeleccionados,
+      remotoUSA,
+      modalidades,
+    }));
+
     await fetch("/api/cv/guardar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,125 +98,187 @@ export default function BusquedaStep({ cvData, onFinish }: Props) {
 
   if (cargando) {
     return (
-      <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "60px 40px", textAlign: "center" }}>
-        <div style={{ fontSize: "40px", marginBottom: "12px" }}>🤖</div>
-        <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "18px", color: "#0F2744", margin: "0 0 8px" }}>
+      <div className="bg-white border border-slate-200/80 rounded-xl p-16 shadow-sm text-center">
+        <div className="text-4xl mb-4 animate-pulse">🤖</div>
+        <h2 className="font-extrabold text-base text-[#0F2744] mb-2" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
           Analizando tu perfil...
         </h2>
-        <p style={{ color: "#64748B", fontSize: "14px", margin: 0 }}>
-          La IA está identificando los puestos ideales para ti.
-        </p>
+        <p className="text-xs text-slate-500">La IA está identificando los puestos ideales para ti.</p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div className="space-y-4">
 
-      <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-        <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "20px", color: "#0F2744", margin: "0 0 6px" }}>
-          ¿Qué trabajo buscas?
-        </h2>
-        <p style={{ color: "#64748B", fontSize: "14px", margin: "0 0 24px" }}>
-          Basándonos en tu CV, te sugerimos estos puestos. Activa los que te interesan, ajusta ubicación y modalidad, o agrega los tuyos.
-        </p>
+      {/* Puestos */}
+      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div className="pb-3 border-b border-slate-100 mb-4">
+          <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
+            Puestos a buscar
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Basándonos en tu CV sugerimos estos puestos. Activa los que te interesan o agrega los tuyos.
+          </p>
+        </div>
 
-        {/* Sugerencias */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+        <div className="space-y-2 mb-4">
           {perfiles.map((perfil, i) => (
-            <div key={i} style={{
-              border: `1.5px solid ${perfil.activo ? "#2563EB" : "#E2E8F0"}`,
-              borderRadius: "12px", padding: "16px",
-              background: perfil.activo ? "#F0F6FF" : "#FAFAFA",
-              transition: "all 0.2s",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: perfil.activo ? "14px" : "0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <button
-                    onClick={() => toggleActivo(i)}
-                    style={{
-                      width: "22px", height: "22px", borderRadius: "6px",
-                      border: `2px solid ${perfil.activo ? "#2563EB" : "#CBD5E1"}`,
-                      background: perfil.activo ? "#2563EB" : "#FFF",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {perfil.activo && <svg viewBox="0 0 12 12" width="10" height="10" fill="none"><path d="M2 6l2.5 2.5L10 3.5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-                  </button>
-                  <span style={{ fontWeight: 700, fontSize: "14px", color: perfil.activo ? "#0F2744" : "#94A3B8" }}>
-                    {perfil.puesto}
-                  </span>
-                </div>
-                {!perfil.activo && <span style={{ fontSize: "11px", color: "#94A3B8" }}>Desactivado</span>}
+            <div
+              key={i}
+              onClick={() => togglePerfil(i)}
+              className={`flex items-center gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${
+                perfil.activo
+                  ? "border-[#2563EB] bg-blue-50/40"
+                  : "border-slate-200 bg-slate-50/50 opacity-60"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+                perfil.activo ? "bg-[#2563EB] border-[#2563EB]" : "border-slate-300 bg-white"
+              }`}>
+                {perfil.activo && (
+                  <svg viewBox="0 0 12 12" width="10" height="10" fill="none">
+                    <path d="M2 6l2.5 2.5L10 3.5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </div>
-
-              {perfil.activo && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", paddingLeft: "34px" }}>
-                  <div>
-                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748B", display: "block", marginBottom: "4px" }}>Ubicación</label>
-                    <input
-                      type="text"
-                      value={perfil.ubicacion}
-                      onChange={(e) => updatePerfil(i, "ubicacion", e.target.value)}
-                      style={{ width: "100%", padding: "8px 10px", border: "1.5px solid #E2E8F0", borderRadius: "7px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
-                      onFocus={(e) => e.target.style.borderColor = "#2563EB"}
-                      onBlur={(e) => e.target.style.borderColor = "#E2E8F0"}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748B", display: "block", marginBottom: "4px" }}>Modalidad</label>
-                    <select
-                      value={perfil.modalidad}
-                      onChange={(e) => updatePerfil(i, "modalidad", e.target.value)}
-                      style={{ width: "100%", padding: "8px 10px", border: "1.5px solid #E2E8F0", borderRadius: "7px", fontSize: "13px", outline: "none", background: "#FFF", boxSizing: "border-box" }}
-                    >
-                      {MODALIDADES.map((m) => <option key={m}>{m}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
+              <span className={`text-sm font-semibold ${perfil.activo ? "text-[#0F2744]" : "text-slate-400"}`}>
+                {perfil.puesto}
+              </span>
             </div>
           ))}
         </div>
 
-        {/* Agregar puesto manual */}
-        <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: "20px" }}>
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#374151", margin: "0 0 10px" }}>
-            ¿Quieres agregar otro puesto?
-          </p>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <input
-              type="text"
-              placeholder="Ej: Project Manager, Scrum Master..."
-              value={nuevoPuesto}
-              onChange={(e) => setNuevoPuesto(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && agregarPuesto()}
-              style={{ flex: 1, padding: "10px 12px", border: "1.5px solid #E2E8F0", borderRadius: "8px", fontSize: "13px", outline: "none" }}
-              onFocus={(e) => e.target.style.borderColor = "#2563EB"}
-              onBlur={(e) => e.target.style.borderColor = "#E2E8F0"}
-            />
-            <button
-              onClick={agregarPuesto}
-              style={{ padding: "10px 18px", background: "#0F2744", color: "#FFF", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 700, fontSize: "13px" }}
-            >
-              + Agregar
-            </button>
-          </div>
+        <div className="flex gap-2 pt-3 border-t border-slate-100">
+          <input
+            type="text"
+            placeholder="Agregar otro puesto..."
+            value={nuevoPuesto}
+            onChange={(e) => setNuevoPuesto(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && agregarPuesto()}
+            className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-[#2563EB] transition-colors"
+          />
+          <button
+            onClick={agregarPuesto}
+            className="px-4 py-2.5 bg-[#0F2744] text-white rounded-lg text-xs font-bold hover:bg-[#1a3a5c] transition-colors"
+          >
+            + Agregar
+          </button>
         </div>
       </div>
 
+      {/* Dónde buscar */}
+      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div className="pb-3 border-b border-slate-100 mb-4">
+          <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
+            ¿Dónde buscamos?
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Selecciona uno o más estados. Aplica para todos los puestos activos.
+          </p>
+        </div>
+
+        <div
+          onClick={toggleTodoMexico}
+          className={`flex items-center gap-3 p-3.5 rounded-lg border cursor-pointer transition-all mb-4 ${
+            todoMexico ? "border-[#2563EB] bg-blue-50/40" : "border-slate-200 bg-slate-50/50"
+          }`}
+        >
+          <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+            todoMexico ? "bg-[#2563EB] border-[#2563EB]" : "border-slate-300 bg-white"
+          }`}>
+            {todoMexico && (
+              <svg viewBox="0 0 12 12" width="10" height="10" fill="none">
+                <path d="M2 6l2.5 2.5L10 3.5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <span className="text-sm font-semibold text-[#0F2744]">Toda la República Mexicana</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+          {ESTADOS.map((estado) => {
+            const activo = estadosSeleccionados.includes(estado);
+            return (
+              <button
+                key={estado}
+                onClick={() => toggleEstado(estado)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all text-left ${
+                  activo
+                    ? "bg-[#2563EB] text-white border-[#2563EB]"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:border-[#2563EB]/50"
+                }`}
+              >
+                {estado}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Modalidad */}
+      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div className="pb-3 border-b border-slate-100 mb-4">
+          <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
+            Modalidad de trabajo
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Puedes elegir más de una. Aplica para todos los puestos activos.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {MODALIDADES.map((m) => (
+            <button
+              key={m}
+              onClick={() => toggleModalidad(m)}
+              className={`py-2.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+                modalidades.includes(m)
+                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-[#2563EB]/50"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {modalidades.length > 0 && (
+          <div
+            onClick={() => setRemotoUSA(!remotoUSA)}
+            className={`flex items-center gap-3 p-3.5 rounded-lg border cursor-pointer transition-all mt-4 ${
+              remotoUSA ? "border-[#2563EB] bg-blue-50/40" : "border-slate-200 bg-slate-50/50"
+            }`}
+          >
+            <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all ${
+              remotoUSA ? "bg-[#2563EB] border-[#2563EB]" : "border-slate-300 bg-white"
+            }`}>
+              {remotoUSA && (
+                <svg viewBox="0 0 12 12" width="10" height="10" fill="none">
+                  <path d="M2 6l2.5 2.5L10 3.5" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#0F2744]">¿Consideramos también vacantes en USA?</p>
+              <p className="text-xs text-slate-500">Empresas de Estados Unidos que contratan talento en México</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Botón guardar */}
       <button
         onClick={handleGuardar}
-        disabled={saving || perfiles.filter(p => p.activo).length === 0}
-        style={{
-          padding: "14px", background: "#2563EB", color: "#FFF", border: "none",
-          borderRadius: "10px", cursor: saving ? "default" : "pointer",
-          fontWeight: 700, fontSize: "15px", opacity: saving ? 0.65 : 1,
-          fontFamily: "var(--font-plus-jakarta), sans-serif",
-        }}
+        disabled={
+          saving ||
+          perfiles.filter((p) => p.activo).length === 0 ||
+          modalidades.length === 0 ||
+          estadosSeleccionados.length === 0
+        }
+        className="w-full py-3.5 bg-[#2563EB] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-all shadow-sm"
+        style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
       >
-        {saving ? "Guardando..." : `Activar ${perfiles.filter(p => p.activo).length} búsqueda(s) →`}
+        {saving ? "Guardando..." : `Activar ${perfiles.filter((p) => p.activo).length} búsqueda(s) →`}
       </button>
     </div>
   );
