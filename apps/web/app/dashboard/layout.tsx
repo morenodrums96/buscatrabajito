@@ -8,6 +8,12 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import NombreModal from "@/components/NombreModal";
 import { DashboardContext, DashboardProfile } from "@/components/dashboard/DashboardContext";
 
+const PLAN_LABELS: Record<string, string> = {
+  free: "GRATUITO",
+  buscador: "BUSCADOR",
+  aplicador: "APLICADOR",
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
@@ -69,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <DashboardHeader
         displayName={profile?.nombreCompleto ?? displayName}
-        planLabel={plan.toUpperCase()}
+        planLabel={PLAN_LABELS[plan] ?? plan.toUpperCase()}
       />
 
       <main className="ml-64 flex-1 p-8 space-y-6 max-w-7xl">

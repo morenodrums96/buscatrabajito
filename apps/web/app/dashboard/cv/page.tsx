@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BusquedaStep from "@/components/BusquedaStep";
 import {
   FileText, Upload, Sparkles, Clock, FileCheck,
@@ -49,6 +49,19 @@ export default function CVPage() {
   const [newSkill, setNewSkill] = useState("");
   const [expandExp, setExpandExp] = useState(true);
   const [expandEdu, setExpandEdu] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/cv/perfil")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.nombreCompleto) {
+          setCvData(data);
+          setFileName("CV guardado");
+          setStep("confirmar");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function uploadFile(file: File) {
     if (file.type !== "application/pdf") {

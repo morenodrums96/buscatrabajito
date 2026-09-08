@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Search, Bell, FileText, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
 import { useDashboard } from "@/components/dashboard/DashboardContext";
+
+interface Perfil {
+  puesto: string;
+  estados: string[];
+  modalidades: string[];
+}
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -14,6 +20,14 @@ export default function Dashboard() {
       ? Math.max(1, Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / 86400000))
       : 1
   );
+  const [perfiles, setPerfiles] = useState<Perfil[]>([]);
+
+  useEffect(() => {
+    fetch("/api/perfiles")
+      .then((r) => r.json())
+      .then((data) => setPerfiles(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -65,28 +79,33 @@ export default function Dashboard() {
         <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
             <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
-              Perfil de búsqueda
+              Búsquedas activas
             </h2>
-            <Link href="/onboarding" className="text-xs text-[#2563EB] hover:underline font-bold">
-              Editar
+            <Link href="/dashboard/cv" className="text-xs text-[#2563EB] hover:underline font-bold">
+              Editar →
             </Link>
           </div>
-          {profile?.puesto ? (
-            <div className="divide-y divide-slate-100 text-xs">
-              {[
-                { label: "Puesto objetivo", value: profile.puesto },
-                { label: "Nivel de experiencia", value: profile.nivel },
-                { label: "Ubicación", value: profile.ubicacion },
-                { label: "Modalidad", value: profile.modalidad },
-              ].map((row) => (
-                <div key={row.label} className="flex justify-between py-2.5">
-                  <span className="text-slate-500">{row.label}</span>
-                  <span className="text-[#0F2744] font-bold">{row.value}</span>
+          {perfiles.length > 0 ? (
+            <div className="space-y-2">
+              {perfiles.slice(0, 4).map((p, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                  <span className="text-sm font-semibold text-[#0F2744]">{p.puesto}</span>
+                  <span className="text-xs text-slate-500">
+                    {p.estados?.length > 2 ? `${p.estados.slice(0,2).join(", ")} +${p.estados.length - 2}` : p.estados?.join(", ")}
+                  </span>
                 </div>
               ))}
+              {perfiles.length > 4 && (
+                <p className="text-xs text-slate-400 pt-1">+{perfiles.length - 4} búsquedas más</p>
+              )}
             </div>
           ) : (
-            <p className="text-xs text-slate-500 py-4">No has configurado tu perfil aún.</p>
+            <div className="text-center py-4">
+              <p className="text-xs text-slate-500 mb-3">No tienes búsquedas activas.</p>
+              <Link href="/dashboard/cv" className="inline-block bg-[#2563EB] text-white px-4 py-2 rounded-lg text-xs font-bold">
+                Configurar en Mi CV →
+              </Link>
+            </div>
           )}
         </div>
 
