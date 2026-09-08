@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import BusquedaStep from "@/components/BusquedaStep";
 interface Experiencia {
   empresa: string;
   puesto: string;
@@ -285,25 +285,7 @@ export default function MiCV() {
 
           {/* PASO: BUSQUEDA */}
           {step === "busqueda" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "32px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-              <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "20px", color: "#0F2744", margin: "0 0 8px" }}>
-                ¿Qué trabajo buscas?
-              </h2>
-              <p style={{ color: "#64748B", fontSize: "14px", margin: "0 0 24px" }}>
-                Define los puestos a los que quieres aplicar. El sistema buscará vacantes para cada uno.
-              </p>
-              {/* Por ahora placeholder — lo construimos en el siguiente paso */}
-              <div style={{ background: "#F8FAFC", border: "2px dashed #CBD5E1", borderRadius: "12px", padding: "32px", textAlign: "center" }}>
-                <p style={{ color: "#94A3B8", fontSize: "14px", margin: 0 }}>Aquí van los perfiles de búsqueda — próximo paso</p>
-              </div>
-              <button
-                onClick={() => setStep("listo")}
-                style={{ marginTop: "20px", width: "100%", padding: "14px", background: "#2563EB", color: "#FFF", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 700, fontSize: "15px", fontFamily: "var(--font-plus-jakarta), sans-serif" }}
-              >
-                Finalizar →
-              </button>
-            </div>
-          )}
+            <BusquedaStep cvData={cvData as Record<string, unknown> | null} onFinish={() => setStep("listo")} />)}
 
           {/* PASO: LISTO */}
           {step === "listo" && (
