@@ -1,310 +1,229 @@
 "use client";
 
-import { useState } from "react";
-import BusquedaStep from "@/components/BusquedaStep";
-interface Experiencia {
-  empresa: string;
-  puesto: string;
-  fechaInicio: string;
-  fechaFin: string;
-  descripcion: string;
-}
+import { useRef, useState } from "react";
+import {
+  FileText,
+  Upload,
+  Sparkles,
+  Clock,
+  FileCheck,
+  Plus,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 
-interface Educacion {
-  institucion: string;
-  carrera: string;
-  anio: string;
-}
+export default function CVPage() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [dragOver, setDragOver] = useState(false);
 
-interface Idioma {
-  idioma: string;
-  nivel: string;
-}
-
-interface CVData {
-  nombreCompleto: string;
-  email: string;
-  telefono: string;
-  ciudad: string;
-  linkedin: string;
-  tituloProfesional: string;
-  habilidades: string[];
-  idiomas: Idioma[];
-  experiencia: Experiencia[];
-  educacion: Educacion[];
-  tieneExperiencia: boolean;
-}
-
-type Step = "inicio" | "extrayendo" | "confirmar" | "busqueda" | "listo";
-
-export default function MiCV() {
-  const [step, setStep] = useState<Step>("inicio");
-  const [cvData, setCvData] = useState<CVData | null>(null);
-  const [error, setError] = useState("");
-  const [newSkill, setNewSkill] = useState("");
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type !== "application/pdf") { setError("Solo se aceptan archivos PDF."); return; }
-
-    setStep("extrayendo");
-    setError("");
+  async function uploadFile(file: File) {
+    if (file.type !== "application/pdf") {
+      setStatus("error");
+      return;
+    }
+    setFileName(file.name);
+    setStatus("uploading");
 
     const formData = new FormData();
     formData.append("cv", file);
 
     try {
       const res = await fetch("/api/cv/extraer", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.error) { setError(data.error); setStep("inicio"); return; }
-      setCvData(data);
-      setStep("confirmar");
-    } catch {
-      setError("Algo salió mal. Intenta de nuevo.");
-      setStep("inicio");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setStatus("done");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("503") || message.includes("HTTP 500")) {
+        setStatus("error");
+        setFileName("El servicio de IA está saturado, intenta en unos minutos");
+      } else {
+        setStatus("error");
+      }
     }
   }
 
-  function updateField(field: keyof CVData, value: string) {
-    setCvData((d) => d ? { ...d, [field]: value } : d);
-  }
-
-  function addSkill() {
-    if (!newSkill.trim()) return;
-    setCvData((d) => d ? { ...d, habilidades: [...d.habilidades, newSkill.trim()] } : d);
-    setNewSkill("");
-  }
-
-  function removeSkill(i: number) {
-    setCvData((d) => d ? { ...d, habilidades: d.habilidades.filter((_, idx) => idx !== i) } : d);
+  function handleFiles(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (file) uploadFile(file);
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "var(--font-inter), sans-serif" }}>
+    <>
+      {/* Encabezado de Sección */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
+        <div>
+          <h1
+            className="text-2xl font-extrabold text-[#0F2744] tracking-tight"
+            style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+          >
+            Gestión de Curriculum Vitae
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Crea, optimiza y gestiona tus versiones de CV adaptadas para sistemas ATS.
+          </p>
+        </div>
 
-      {/* TOPBAR */}
-      <header style={{ background: "#0F2744", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <a href="/" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "20px", textDecoration: "none", color: "#FFFFFF" }}>
-          Busco<span style={{ color: "#60A5FA" }}>Trabajito</span>
-        </a>
-        <a href="/dashboard" style={{ color: "rgba(255,255,255,0.75)", fontSize: "13px", textDecoration: "none" }}>← Volver al dashboard</a>
-      </header>
+        <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
+          <Plus className="w-4 h-4" />
+          Generar nuevo CV
+        </button>
+      </div>
 
-      <div style={{ display: "flex", paddingTop: "64px" }}>
+      {/* Panel Principal: Subir / Optimizar CV */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tarjeta de Carga de Archivo */}
+        <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+              <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#2563EB]" />
+                CV Base Principal
+              </h2>
+              {status === "done" && (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                  Formato ATS Detectado
+                </span>
+              )}
+            </div>
 
-        {/* SIDEBAR */}
-        <aside style={{ width: "220px", background: "#FFFFFF", borderRight: "1px solid #E2E8F0", position: "fixed", top: "64px", left: 0, bottom: 0 }}>
-          <nav style={{ padding: "20px 12px" }}>
-            {[
-              { icon: "🏠", label: "Inicio", href: "/dashboard" },
-              { icon: "📄", label: "Mi CV", href: "/dashboard/cv", active: true },
-              { icon: "🔍", label: "Vacantes", href: "/dashboard/vacantes" },
-              { icon: "⚙️", label: "Configuración", href: "/dashboard/configuracion" },
-            ].map((item) => (
-              <a key={item.href} href={item.href} style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                padding: "10px 12px", borderRadius: "9px", marginBottom: "4px",
-                textDecoration: "none", fontSize: "14px",
-                fontWeight: item.active ? 700 : 500,
-                color: item.active ? "#2563EB" : "#475569",
-                background: item.active ? "#EFF6FF" : "transparent",
-              }}>
-                <span>{item.icon}</span>{item.label}
-              </a>
-            ))}
-          </nav>
-        </aside>
-
-        {/* CONTENIDO */}
-        <main style={{ marginLeft: "220px", flex: 1, padding: "32px 28px", maxWidth: "800px" }}>
-
-          <div style={{ marginBottom: "28px" }}>
-            <h1 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "24px", color: "#0F2744", margin: "0 0 4px" }}>
-              Mi CV
-            </h1>
-            <p style={{ color: "#64748B", fontSize: "14px", margin: 0 }}>
-              Tu información personal que usamos para buscar vacantes y generar tu CV profesional.
-            </p>
+            {/* Zona de Dropzone */}
+            <input
+              ref={inputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            <div
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                handleFiles(e.dataTransfer.files);
+              }}
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${dragOver
+                ? "border-[#2563EB] bg-blue-50/40"
+                : "border-slate-200 hover:border-[#2563EB]/50 bg-slate-50/50 hover:bg-blue-50/20"
+                }`}
+            >
+              {status === "uploading" ? (
+                <>
+                  <Loader2 className="w-10 h-10 text-[#2563EB] mx-auto mb-3 animate-spin" />
+                  <p className="font-bold text-xs text-[#0F2744] mb-1">Analizando {fileName}...</p>
+                  <p className="text-[11px] text-slate-400">Esto puede tardar unos segundos</p>
+                </>
+              ) : status === "done" ? (
+                <>
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+                  <p className="font-bold text-xs text-[#0F2744] mb-1">{fileName}</p>
+                  <p className="text-[11px] text-slate-400">Analizado correctamente · Haz clic para reemplazar</p>
+                </>
+              ) : status === "error" ? (
+                <>
+                  <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+                  <p className="font-bold text-xs text-[#0F2744] mb-1">No se pudo procesar el archivo</p>
+                  <p className="text-[11px] text-slate-400">Solo aceptamos PDF · Haz clic para intentar de nuevo</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-10 h-10 text-slate-400 group-hover:text-[#2563EB] mx-auto mb-3 transition-colors" />
+                  <p className="font-bold text-xs text-[#0F2744] mb-1">
+                    Arrastra tu CV aquí o haz clic para examinar
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Soporta archivos PDF (Máx. 5 MB)
+                  </p>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* PASO: INICIO */}
-          {step === "inicio" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "40px", textAlign: "center", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>📄</div>
-              <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "20px", color: "#0F2744", margin: "0 0 8px" }}>
-                ¿Tienes un CV?
-              </h2>
-              <p style={{ color: "#64748B", fontSize: "14px", maxWidth: "400px", margin: "0 auto 28px", lineHeight: 1.6 }}>
-                Sube tu CV en PDF y nuestra IA extrae toda la información automáticamente. Solo tendrás que confirmar que los datos sean correctos.
-              </p>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              Última actualización: {status === "done" && fileName ? fileName : "Sin archivos aún"}
+            </span>
+            <button
+              onClick={() => inputRef.current?.click()}
+              className="text-[#2563EB] font-bold hover:underline text-xs flex items-center gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Re-analizar CV
+            </button>
+          </div>
+        </div>
 
-              {error && <p style={{ color: "#EF4444", fontSize: "13px", marginBottom: "16px" }}>{error}</p>}
+        {/* Panel de Puntuación / Métricas ATS */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
+              Diagnóstico de Legibilidad ATS
+            </h2>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
-                <label style={{
-                  display: "inline-flex", alignItems: "center", gap: "8px",
-                  padding: "13px 28px", background: "#2563EB", color: "#FFF",
-                  borderRadius: "10px", cursor: "pointer", fontWeight: 700,
-                  fontSize: "14px", fontFamily: "var(--font-plus-jakarta), sans-serif",
-                }}>
-                  📎 Subir mi CV en PDF
-                  <input type="file" accept=".pdf" onChange={handleFileUpload} style={{ display: "none" }} />
-                </label>
-
-                <button
-                  onClick={() => setStep("confirmar")}
-                  style={{ background: "transparent", border: "none", color: "#64748B", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}
-                >
-                  No tengo CV — llenar manualmente
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* PASO: EXTRAYENDO */}
-          {step === "extrayendo" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "60px 40px", textAlign: "center" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px", animation: "spin 2s linear infinite", display: "inline-block" }}>⚙️</div>
-              <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "20px", color: "#0F2744", margin: "0 0 8px" }}>
-                Analizando tu CV...
-              </h2>
-              <p style={{ color: "#64748B", fontSize: "14px" }}>
-                Nuestra IA está extrayendo tu información. Esto tarda unos segundos.
-              </p>
-              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-            </div>
-          )}
-
-          {/* PASO: CONFIRMAR */}
-          {step === "confirmar" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-              {/* Info personal */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-                <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 700, fontSize: "16px", color: "#0F2744", margin: "0 0 20px" }}>
-                  Información personal
-                </h2>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-                  {[
-                    { label: "Nombre completo", field: "nombreCompleto" as keyof CVData },
-                    { label: "Correo", field: "email" as keyof CVData },
-                    { label: "Teléfono", field: "telefono" as keyof CVData },
-                    { label: "Ciudad", field: "ciudad" as keyof CVData },
-                    { label: "LinkedIn", field: "linkedin" as keyof CVData },
-                    { label: "Título / Área profesional", field: "tituloProfesional" as keyof CVData },
-                  ].map((f) => (
-                    <div key={f.field}>
-                      <label style={{ fontSize: "12px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "5px" }}>{f.label}</label>
-                      <input
-                        type="text"
-                        value={cvData?.[f.field] as string ?? ""}
-                        onChange={(e) => updateField(f.field, e.target.value)}
-                        style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #E2E8F0", borderRadius: "8px", fontSize: "13px", color: "#0F2744", outline: "none", boxSizing: "border-box" }}
-                        onFocus={(e) => e.target.style.borderColor = "#2563EB"}
-                        onBlur={(e) => e.target.style.borderColor = "#E2E8F0"}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Habilidades */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-                <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 700, fontSize: "16px", color: "#0F2744", margin: "0 0 16px" }}>
-                  Habilidades
-                </h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
-                  {cvData?.habilidades.map((skill, i) => (
-                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#EFF6FF", color: "#2563EB", padding: "5px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>
-                      {skill}
-                      <button onClick={() => removeSkill(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563EB", fontSize: "14px", lineHeight: 1, padding: 0 }}>×</button>
-                    </span>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input
-                    type="text"
-                    placeholder="Agregar habilidad"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addSkill()}
-                    style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #E2E8F0", borderRadius: "8px", fontSize: "13px", outline: "none" }}
-                  />
-                  <button onClick={addSkill} style={{ padding: "9px 16px", background: "#2563EB", color: "#FFF", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>
-                    Agregar
-                  </button>
-                </div>
-              </div>
-
-              {/* Experiencia */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-                <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 700, fontSize: "16px", color: "#0F2744", margin: "0 0 16px" }}>
-                  Experiencia laboral
-                </h2>
-                {cvData?.experiencia.length === 0 || !cvData?.tieneExperiencia ? (
-                  <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: "10px", padding: "16px" }}>
-                    <p style={{ color: "#92400E", fontSize: "13px", margin: "0 0 4px", fontWeight: 600 }}>Sin experiencia laboral detectada</p>
-                    <p style={{ color: "#B45309", fontSize: "12px", margin: 0 }}>No te preocupes — usaremos tus estudios y proyectos para construir tu CV.</p>
-                  </div>
-                ) : (
-                  cvData?.experiencia.map((exp, i) => (
-                    <div key={i} style={{ padding: "14px", background: "#F8FAFC", borderRadius: "10px", marginBottom: "10px", border: "1px solid #E2E8F0" }}>
-                      <p style={{ fontWeight: 700, fontSize: "14px", color: "#0F2744", margin: "0 0 2px" }}>{exp.puesto}</p>
-                      <p style={{ fontSize: "13px", color: "#2563EB", margin: "0 0 2px" }}>{exp.empresa}</p>
-                      <p style={{ fontSize: "12px", color: "#64748B", margin: "0 0 6px" }}>{exp.fechaInicio} — {exp.fechaFin}</p>
-                      <p style={{ fontSize: "12px", color: "#475569", margin: 0, lineHeight: 1.5 }}>{exp.descripcion}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Educación */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-                <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 700, fontSize: "16px", color: "#0F2744", margin: "0 0 16px" }}>
-                  Educación
-                </h2>
-                {cvData?.educacion.map((edu, i) => (
-                  <div key={i} style={{ padding: "14px", background: "#F8FAFC", borderRadius: "10px", marginBottom: "10px", border: "1px solid #E2E8F0" }}>
-                    <p style={{ fontWeight: 700, fontSize: "14px", color: "#0F2744", margin: "0 0 2px" }}>{edu.carrera}</p>
-                    <p style={{ fontSize: "13px", color: "#64748B", margin: "0 0 2px" }}>{edu.institucion}</p>
-                    <p style={{ fontSize: "12px", color: "#94A3B8", margin: 0 }}>{edu.anio}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Botón continuar */}
-              <button
-                onClick={() => setStep("busqueda")}
-                style={{ padding: "14px", background: "#2563EB", color: "#FFF", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 700, fontSize: "15px", fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+            <div className="text-center py-4">
+              <div
+                className="text-4xl font-extrabold text-[#0F2744] tracking-tight"
+                style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
               >
-                Confirmar información → Definir búsquedas
-              </button>
+                --<span className="text-sm font-semibold text-slate-400">/100</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 font-medium">Compatibilidad general</p>
             </div>
-          )}
 
-          {/* PASO: BUSQUEDA */}
-          {step === "busqueda" && (
-            <BusquedaStep cvData={cvData as Record<string, unknown> | null} onFinish={() => setStep("listo")} />)}
-
-          {/* PASO: LISTO */}
-          {step === "listo" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "16px", padding: "48px", textAlign: "center", boxShadow: "0 2px 8px rgba(15,39,68,0.04)" }}>
-              <div style={{ fontSize: "56px", marginBottom: "16px" }}>🎉</div>
-              <h2 style={{ fontFamily: "var(--font-plus-jakarta), sans-serif", fontWeight: 800, fontSize: "22px", color: "#0F2744", margin: "0 0 8px" }}>
-                ¡Todo listo!
-              </h2>
-              <p style={{ color: "#64748B", fontSize: "14px", maxWidth: "360px", margin: "0 auto 24px" }}>
-                Tu perfil está configurado. Empezamos a buscar vacantes para ti ahora mismo.
-              </p>
-              <a href="/dashboard" style={{ display: "inline-block", padding: "13px 28px", background: "#2563EB", color: "#FFF", borderRadius: "10px", textDecoration: "none", fontWeight: 700, fontSize: "14px", fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
-                Ir al dashboard →
-              </a>
+            <div className="space-y-2.5 pt-2 text-xs">
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Estructura & Formato</span>
+                <span className="font-bold text-slate-400">Pendiente</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Palabras clave del sector</span>
+                <span className="font-bold text-slate-400">Pendiente</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5">
+                <span className="text-slate-500">Claridad de experiencia</span>
+                <span className="font-bold text-slate-400">Pendiente</span>
+              </div>
             </div>
-          )}
+          </div>
 
-        </main>
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <button
+              disabled
+              className="w-full py-2.5 px-3 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" /> Optimizar con IA
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Historial de CVs Generados */}
+      <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+          <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
+            Versiones Generadas y Adaptadas
+          </h2>
+          <span className="text-xs text-slate-400 font-medium">0 documentos creados</span>
+        </div>
+
+        <div className="text-center py-12 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+          <FileCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          <p className="font-bold text-[#0F2744] text-xs mb-1">
+            Aún no has generado versiones personalizadas de tu CV
+          </p>
+          <p className="text-slate-400 text-[11px] max-w-sm mx-auto">
+            Cuando apliques a vacantes específicas, la plataforma generará automáticamente adaptaciones optimizadas para cada oferta.
+          </p>
+        </div>
+      </div>
+    </>
   );
 }

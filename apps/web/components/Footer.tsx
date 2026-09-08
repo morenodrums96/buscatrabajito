@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -30,7 +32,7 @@ export default function Footer() {
           }}
         >
           {/* Logo */}
-          <a
+          <Link
             href="/"
             style={{
               fontFamily: "var(--font-plus-jakarta), sans-serif",
@@ -42,7 +44,7 @@ export default function Footer() {
             }}
           >
             Busco<span style={{ color: "#60A5FA" }}>Trabajito</span>
-          </a>
+          </Link>
 
           {/* Navigation links */}
           <nav

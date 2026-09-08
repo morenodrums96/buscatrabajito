@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -41,7 +42,7 @@ export default function Navbar() {
       }}
     >
       {/* LOGO */}
-      <a
+      <Link
         href="/"
         style={{
           fontFamily: "var(--font-plus-jakarta), sans-serif",
@@ -57,7 +58,7 @@ export default function Navbar() {
       >
         Busco
         <span style={{ color: "#60A5FA" }}>Trabajito</span>
-      </a>
+      </Link>
 
       {/* NAVIGATION */}
       <nav
@@ -110,7 +111,7 @@ export default function Navbar() {
           }}
         >
           {/* Iniciar sesión */}
-          <a
+          <Link
             href="/sign-in"
             style={{
               color: "rgba(255, 255, 255, 0.85)",
@@ -132,10 +133,10 @@ export default function Navbar() {
             }}
           >
             Iniciar sesión
-          </a>
+          </Link>
 
           {/* Crear cuenta (Rediseñado: Subtle Glass / Border Accent) */}
-          <a
+          <Link
             href="/sign-up"
             style={{
               background: "rgba(255, 255, 255, 0.06)",
@@ -166,7 +167,7 @@ export default function Navbar() {
             }}
           >
             Crear cuenta
-          </a>
+          </Link>
         </div>
       </nav>
     </header>

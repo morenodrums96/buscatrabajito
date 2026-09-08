@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 const TRUST_BADGES = [
   "100% gratis para empezar",
   "Sin spam",
@@ -167,7 +169,7 @@ export default function HeroSection() {
               gap: "14px",
             }}
           >
-            <a
+            <Link
               href="/sign-up"
               style={{
                 display: "inline-flex",
@@ -198,7 +200,7 @@ export default function HeroSection() {
             >
               Crear cuenta gratis
               <span style={{ fontSize: "16px" }}>&rarr;</span>
-            </a>
+            </Link>
 
             <p
               style={{
