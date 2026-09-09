@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import BusquedaStep from "@/components/BusquedaStep";
 import {
   FileText, Upload, Sparkles, Clock, FileCheck,
-  Plus, RefreshCw, CheckCircle2, AlertCircle, Loader2,
-  ChevronDown, ChevronUp, X,
+  Plus, RefreshCw, CheckCircle2, Loader2,
+  ChevronDown, ChevronUp, X, Briefcase, GraduationCap, Globe
 } from "lucide-react";
 
 interface Experiencia {
@@ -140,12 +140,10 @@ export default function CVPage() {
     setCvData((d) => d ? { ...d, idiomas: d.idiomas.filter((_, idx) => idx !== i) } : d);
   }
 
-  const uploadStatus = step === "uploading" ? "uploading" : step === "idle" ? "idle" : "done";
-
   return (
-    <>
+    <div className="space-y-6 pb-12">
       {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200/60">
         <div>
           <h1 className="text-2xl font-extrabold text-[#0F2744] tracking-tight" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
             Gestión de Curriculum Vitae
@@ -156,25 +154,25 @@ export default function CVPage() {
         </div>
         <button
           onClick={() => { setStep("idle"); setCvData(null); setFileName(null); }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           {step !== "idle" ? "Subir nuevo CV" : "Generar nuevo CV"}
         </button>
       </div>
 
-      {/* Panel Dropzone + ATS */}
+      {/* Panel Dropzone + ATS Diagnostic */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Dropzone */}
-        <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-              <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider flex items-center gap-2">
+              <h2 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#2563EB]" />
                 CV Base Principal
               </h2>
               {step === "confirmar" || step === "busqueda" || step === "listo" ? (
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
                   Formato ATS Detectado
                 </span>
               ) : null}
@@ -191,23 +189,23 @@ export default function CVPage() {
               } ${dragOver ? "border-[#2563EB] bg-blue-50/40" : "border-slate-200 hover:border-[#2563EB]/50 bg-slate-50/50 hover:bg-blue-50/20"}`}
             >
               {step === "uploading" ? (
-                <>
-                  <Loader2 className="w-10 h-10 text-[#2563EB] mx-auto mb-3 animate-spin" />
+                <div className="py-2">
+                  <Loader2 className="w-9 h-9 text-[#2563EB] mx-auto mb-3 animate-spin" />
                   <p className="font-bold text-xs text-[#0F2744] mb-1">Analizando {fileName}...</p>
-                  <p className="text-[11px] text-slate-400">La IA está extrayendo tu información</p>
-                </>
+                  <p className="text-[11px] text-slate-400">La IA está extrayendo tu información profesional</p>
+                </div>
               ) : step !== "idle" ? (
-                <>
-                  <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+                <div className="py-2">
+                  <CheckCircle2 className="w-9 h-9 text-emerald-500 mx-auto mb-3" />
                   <p className="font-bold text-xs text-[#0F2744] mb-1">{fileName}</p>
-                  <p className="text-[11px] text-slate-400">Analizado correctamente</p>
-                </>
+                  <p className="text-[11px] text-emerald-600 font-medium">Analizado y procesado correctamente</p>
+                </div>
               ) : (
-                <>
-                  <Upload className="w-10 h-10 text-slate-400 group-hover:text-[#2563EB] mx-auto mb-3 transition-colors" />
+                <div className="py-2">
+                  <Upload className="w-9 h-9 text-slate-400 group-hover:text-[#2563EB] mx-auto mb-3 transition-colors" />
                   <p className="font-bold text-xs text-[#0F2744] mb-1">Arrastra tu CV aquí o haz clic para examinar</p>
                   <p className="text-[11px] text-slate-400">Soporta archivos PDF (Máx. 5 MB)</p>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -215,38 +213,42 @@ export default function CVPage() {
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5 text-[11px]">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
-              {fileName ? `Última actualización: ${fileName}` : "Sin archivos aún"}
+              {fileName ? `Archivo actual: ${fileName}` : "Sin archivos subidos"}
             </span>
-            <button onClick={() => { setStep("idle"); setCvData(null); setFileName(null); inputRef.current?.click(); }} className="text-[#2563EB] font-bold hover:underline text-xs flex items-center gap-1">
-              <RefreshCw className="w-3.5 h-3.5" /> Re-analizar CV
+            <button 
+              type="button"
+              onClick={() => { setStep("idle"); setCvData(null); setFileName(null); setTimeout(() => inputRef.current?.click(), 50); }} 
+              className="text-[#2563EB] font-bold hover:underline text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3" /> Re-analizar CV
             </button>
           </div>
         </div>
 
-        {/* ATS Score */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+        {/* Diagnostic Score */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
           <div>
-            <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
+            <h2 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
               Diagnóstico de Legibilidad ATS
             </h2>
-            <div className="text-center py-4">
+            <div className="text-center py-3">
               <div className="text-4xl font-extrabold text-[#0F2744] tracking-tight" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
                 --<span className="text-sm font-semibold text-slate-400">/100</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 font-medium">Compatibilidad general</p>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium">Compatibilidad general ATS</p>
             </div>
-            <div className="space-y-2.5 pt-2 text-xs">
+            <div className="space-y-2 pt-2 text-xs">
               {["Estructura & Formato", "Palabras clave del sector", "Claridad de experiencia"].map((label) => (
-                <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-100 text-[11px]">
                   <span className="text-slate-500">{label}</span>
-                  <span className="font-bold text-slate-400">Pendiente</span>
+                  <span className="font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Pendiente</span>
                 </div>
               ))}
             </div>
           </div>
           <div className="mt-6 pt-4 border-t border-slate-100">
-            <button disabled className="w-full py-2.5 px-3 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center justify-center gap-2">
-              <Sparkles className="w-4 h-4" /> Optimizar con IA
+            <button disabled className="w-full py-2.5 px-3 bg-slate-100 text-slate-400 rounded-xl text-xs font-bold cursor-not-allowed flex items-center justify-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" /> Optimizar con IA
             </button>
           </div>
         </div>
@@ -254,17 +256,17 @@ export default function CVPage() {
 
       {/* ── CONFIRMACIÓN DE DATOS ── */}
       {step === "confirmar" && cvData && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="font-extrabold text-base text-[#0F2744]" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
               Confirma tu información
             </h2>
-            <span className="text-xs text-slate-500">Revisa y corrige si es necesario</span>
+            <span className="text-xs text-slate-500">Revisa y ajusta los detalles extraídos</span>
           </div>
 
-          {/* Info personal */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
-            <h3 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
+          {/* Información Personal */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+            <h3 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
               Información personal
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -280,43 +282,55 @@ export default function CVPage() {
                   <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">{f.label}</label>
                   <input
                     type="text"
-                    value={cvData[f.field] as string ?? ""}
+                    value={(cvData[f.field] as string) ?? ""}
                     onChange={(e) => updateField(f.field, e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-[#0F2744] outline-none focus:border-[#2563EB] transition-colors"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-[#0F2744] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-500/10 transition-all"
                   />
                 </div>
               ))}
 
-              {/* Idiomas: ocupa una sola columna del grid */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Idiomas</label>
-                <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+              {/* Idiomas */}
+              <div className="sm:col-span-2 mt-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-slate-400" /> Idiomas
+                </label>
+                <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/50 space-y-2.5">
                   {cvData.idiomas.length === 0 ? (
-                    <p className="text-xs text-slate-400">Aún no agregas idiomas.</p>
-                  ) : cvData.idiomas.map((idi, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Idioma (ej. Inglés)"
-                        value={idi.idioma}
-                        onChange={(e) => updateIdioma(i, "idioma", e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-[#0F2744] outline-none focus:border-[#2563EB] transition-colors"
-                      />
-                      <select
-                        value={idi.nivel}
-                        onChange={(e) => updateIdioma(i, "nivel", e.target.value)}
-                        className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-[#0F2744] outline-none focus:border-[#2563EB] transition-colors bg-white"
-                      >
-                        {NIVELES_IDIOMA.map((nivel) => (
-                          <option key={nivel} value={nivel}>{nivel}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => removeIdioma(i)} className="text-slate-400 hover:text-red-500 transition-colors p-1 flex-shrink-0">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button onClick={addIdioma} className="px-4 py-2 bg-[#0F2744] text-white rounded-lg text-xs font-bold hover:bg-[#1a3a5c] transition-colors">
+                    <p className="text-xs text-slate-400">Sin idiomas asignados.</p>
+                  ) : (
+                    cvData.idiomas.map((idi, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Idioma (ej. Inglés)"
+                          value={idi.idioma}
+                          onChange={(e) => updateIdioma(i, "idioma", e.target.value)}
+                          className="flex-1 min-w-0 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-[#0F2744] outline-none focus:border-[#2563EB]"
+                        />
+                        <select
+                          value={idi.nivel}
+                          onChange={(e) => updateIdioma(i, "nivel", e.target.value)}
+                          className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-[#0F2744] outline-none focus:border-[#2563EB]"
+                        >
+                          {NIVELES_IDIOMA.map((nivel) => (
+                            <option key={nivel} value={nivel}>{nivel}</option>
+                          ))}
+                        </select>
+                        <button 
+                          type="button" 
+                          onClick={() => removeIdioma(i)} 
+                          className="text-slate-400 hover:text-rose-500 transition-colors p-1"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                  <button
+                    type="button"
+                    onClick={addIdioma}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0F2744] hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                  >
                     + Agregar idioma
                   </button>
                 </div>
@@ -325,58 +339,64 @@ export default function CVPage() {
           </div>
 
           {/* Habilidades */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
-            <h3 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+            <h3 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider mb-4 pb-3 border-b border-slate-100">
               Habilidades técnicas
             </h3>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-4">
               {cvData.habilidades.map((skill, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-[#2563EB] border border-blue-200 px-3 py-1 rounded-full text-xs font-bold">
+                <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-[#2563EB] border border-blue-200 px-3 py-1 rounded-lg text-xs font-bold">
                   {skill}
-                  <button onClick={() => removeSkill(i)} className="hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => removeSkill(i)} className="hover:text-rose-500 transition-colors">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-w-md">
               <input
                 type="text"
-                placeholder="Agregar habilidad"
+                placeholder="Ej. React, Node.js, SQL..."
                 value={newSkill}
                 onChange={(e) => setNewSkill(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addSkill()}
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-[#2563EB] transition-colors"
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#2563EB]"
               />
-              <button onClick={addSkill} className="px-4 py-2 bg-[#0F2744] text-white rounded-lg text-xs font-bold hover:bg-[#1a3a5c] transition-colors">
-                + Agregar
+              <button 
+                type="button" 
+                onClick={addSkill} 
+                className="px-4 py-2 bg-[#0F2744] text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Agregar
               </button>
             </div>
           </div>
 
           {/* Experiencia */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
             <button
+              type="button"
               onClick={() => setExpandExp(!expandExp)}
-              className="w-full flex items-center justify-between mb-3"
+              className="w-full flex items-center justify-between mb-2 cursor-pointer"
             >
-              <h3 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
-                Experiencia laboral · {cvData.experiencia.length} registros
+              <h3 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider flex items-center gap-2">
+                <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                Experiencia laboral ({cvData.experiencia.length})
               </h3>
               {expandExp ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
             </button>
             {expandExp && (
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 {cvData.experiencia.length === 0 ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <p className="text-xs font-bold text-amber-800">Sin experiencia laboral detectada</p>
-                    <p className="text-xs text-amber-600 mt-1">Usaremos tus estudios y proyectos para construir tu CV.</p>
+                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4">
+                    <p className="text-xs font-bold text-amber-800">Sin experiencia laboral previa detectada</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">Utilizaremos tus proyectos y formación académica para potenciar tu perfil.</p>
                   </div>
                 ) : cvData.experiencia.map((exp, i) => (
-                  <div key={i} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="font-bold text-sm text-[#0F2744]">{exp.puesto}</p>
+                  <div key={i} className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/70">
+                    <p className="font-bold text-xs text-[#0F2744]">{exp.puesto}</p>
                     <p className="text-xs text-[#2563EB] font-semibold mt-0.5">{exp.empresa}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{exp.fechaInicio} — {exp.fechaFin}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{exp.fechaInicio} — {exp.fechaFin}</p>
                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">{exp.descripcion}</p>
                   </div>
                 ))}
@@ -385,33 +405,36 @@ export default function CVPage() {
           </div>
 
           {/* Educación */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
             <button
+              type="button"
               onClick={() => setExpandEdu(!expandEdu)}
-              className="w-full flex items-center justify-between mb-3"
+              className="w-full flex items-center justify-between mb-2 cursor-pointer"
             >
-              <h3 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
-                Educación · {cvData.educacion.length} registros
+              <h3 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-slate-400" />
+                Educación ({cvData.educacion.length})
               </h3>
               {expandEdu ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
             </button>
             {expandEdu && (
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 {cvData.educacion.map((edu, i) => (
-                  <div key={i} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p className="font-bold text-sm text-[#0F2744]">{edu.carrera}</p>
+                  <div key={i} className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/70">
+                    <p className="font-bold text-xs text-[#0F2744]">{edu.carrera}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{edu.institucion}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{edu.anio}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{edu.anio}</p>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Botón continuar */}
+          {/* Continuar */}
           <button
+            type="button"
             onClick={() => setStep("busqueda")}
-            className="w-full py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-all shadow-sm"
+            className="w-full py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95 cursor-pointer"
             style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
           >
             Confirmar información → Definir búsquedas
@@ -424,82 +447,82 @@ export default function CVPage() {
         <BusquedaStep cvData={cvData as Record<string, unknown> | null} onFinish={() => setStep("listo")} />
       )}
 
-      {/* ── LISTO CON REDIRECCIÓN SUAVE Y AUTO-AYUDA ── */}
-      {step === "listo" && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="bg-white border border-slate-200/80 rounded-2xl p-10 sm:p-14 shadow-lg text-center max-w-xl mx-auto"
-        >
-          <div className="w-16 h-16 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm">
-            <CheckCircle2 className="w-9 h-9 animate-bounce" />
-          </div>
-
-          <h2
-            className="font-extrabold text-2xl text-[#0F2744] mb-2 tracking-tight"
-            style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+      {/* ── FINALIZADO CON AUTO-REDIRECCIÓN ── */}
+      <AnimatePresence>
+        {step === "listo" && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="bg-white border border-slate-200/80 rounded-2xl p-8 sm:p-12 shadow-lg text-center max-w-xl mx-auto"
           >
-            ¡Perfil y CV Guardados con Éxito!
-          </h2>
+            <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xs">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
 
-          <p className="text-slate-500 text-sm max-w-md mx-auto mb-6 leading-relaxed">
-            Tu información ha sido optimizada para ATS. Estamos escaneando automáticamente las mejores ofertas según tu perfil.
-          </p>
+            <h2
+              className="font-extrabold text-2xl text-[#0F2744] mb-2 tracking-tight"
+              style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+            >
+              ¡Perfil y CV Guardados con Éxito!
+            </h2>
 
-          {/* Tarjeta Guía del Siguiente Paso */}
-          <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-4 mb-6 text-left flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-[#2563EB] flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-slate-700 space-y-1">
-              <p className="font-bold text-[#0F2744]">💡 ¿Qué sigue ahora?</p>
-              <p className="text-slate-600">
-                En tu Panel Principal verás el radar de búsquedas en tiempo real y podrás ajustar tus alertas por correo o WhatsApp.
+            <p className="text-slate-500 text-xs max-w-md mx-auto mb-6 leading-relaxed">
+              Tu información se ha optimizado para ATS. La plataforma está escaneando vacantes en tiempo real asociadas a tu perfil.
+            </p>
+
+            <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-4 mb-6 text-left flex items-start gap-3">
+              <Sparkles className="w-4 h-4 text-[#2563EB] flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-700 space-y-1">
+                <p className="font-bold text-[#0F2744]">💡 ¿Qué sigue ahora?</p>
+                <p className="text-slate-600 text-[11px]">
+                  En tu Panel Principal verás el radar de búsquedas en tiempo real y podrás ajustar tus alertas por correo o WhatsApp.
+                </p>
+              </div>
+            </div>
+
+            {/* Contador de Auto-Redirección */}
+            <div className="mb-6">
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#2563EB] rounded-full transition-all duration-1000 ease-linear"
+                  style={{ width: `${((SEGUNDOS_REDIRECCION - segundosRestantes) / SEGUNDOS_REDIRECCION) * 100}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Redirigiendo al dashboard en {segundosRestantes}s...
               </p>
             </div>
-          </div>
 
-          {/* Barra + contador de auto-redirección */}
-          <div className="mb-6">
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-[#2563EB] rounded-full transition-[width] duration-1000 ease-linear"
-                style={{ width: `${((SEGUNDOS_REDIRECCION - segundosRestantes) / SEGUNDOS_REDIRECCION) * 100}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Te llevaremos al dashboard en {segundosRestantes}s...
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/dashboard"
-              className="w-full sm:w-auto px-7 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95"
+              className="inline-flex px-6 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95"
             >
               Ir al Dashboard ahora →
             </Link>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Historial de CVs */}
       {step !== "confirmar" && step !== "busqueda" && step !== "listo" && (
-        <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
           <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-            <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
+            <h2 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider">
               Versiones Generadas y Adaptadas
             </h2>
             <span className="text-xs text-slate-400 font-medium">0 documentos creados</span>
           </div>
-          <div className="text-center py-12 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+          <div className="text-center py-12 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
             <FileCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="font-bold text-[#0F2744] text-xs mb-1">Aún no has generado versiones personalizadas de tu CV</p>
+            <p className="font-bold text-[#0F2744] text-xs mb-1">Aún no has generado versiones personalizadas</p>
             <p className="text-slate-400 text-[11px] max-w-sm mx-auto">
-              Cuando apliques a vacantes específicas, la plataforma generará adaptaciones optimizadas para cada oferta.
+              Al aplicar a vacantes específicas, el sistema adaptará tu plantilla para optimizar la compatibilidad ATS.
             </p>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -47,7 +47,11 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="es" className={`${plusJakarta.variable} ${inter.variable} ${greatVibes.variable}`}>
+      <html
+        lang="es"
+        data-scroll-behavior="smooth"
+        className={`${plusJakarta.variable} ${inter.variable} ${greatVibes.variable}`}
+      >
         <body>{children}</body>
       </html>
     </ClerkProvider>

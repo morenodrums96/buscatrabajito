@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const showSpinner = !isLoaded || loading || signingOut;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans antialiased selection:bg-blue-100 selection:text-blue-900">
       <DashboardSidebar
         pathname={pathname}
         isFreePlan={plan === "free"}
@@ -62,18 +62,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       />
 
       <DashboardHeader
-        displayName={profile?.nombreCompleto ?? displayName}
+        displayName={displayName}
         planLabel={PLAN_LABELS[plan] ?? plan.toUpperCase()}
       />
 
       <main className="ml-64 flex-1 p-8 space-y-6 max-w-7xl">
         {showSpinner ? (
-          <div className="flex items-center justify-center h-[60vh]">
-            <div className="w-8 h-8 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center h-[60vh] space-y-3 animate-in fade-in duration-300">
+            <div className="w-9 h-9 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs font-semibold text-slate-400 tracking-wide">
+              Cargando tu panel...
+            </p>
           </div>
         ) : (
           <DashboardContext.Provider value={{ profile, displayName, setDisplayName, plan }}>
-            {children}
+            <div className="animate-in fade-in duration-300">
+              {children}
+            </div>
           </DashboardContext.Provider>
         )}
       </main>
