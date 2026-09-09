@@ -5,13 +5,20 @@ import OpenAI from "openai";
 import { PDFParse } from "pdf-parse";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { nombreCoincide } from "@/lib/nombreCoincide";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const dbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
 const db = DynamoDBDocumentClient.from(dbClient);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-async function extraerCV(userId: string, buffer: Buffer, key: string) {
+async function extraerCV(
+  userId: string,
+  buffer: Buffer,
+  key: string,
+  nombreEsperado: string,
+  apellidoEsperado: string
+) {
   try {
     const parser = new PDFParse({ data: buffer });
     const pdfData = await parser.getText();
@@ -53,6 +60,9 @@ ${texto}`,
     const text = response.choices[0].message.content?.trim() ?? "";
     const clean = text.replace(/```json|```/g, "").trim();
     const data = JSON.parse(clean);
+    const estado = nombreCoincide(data.nombreCompleto, nombreEsperado, apellidoEsperado)
+      ? "ready"
+      : "mismatch";
 
     await db.send(new UpdateCommand({
       TableName: "buscatrabajito-users",
@@ -60,7 +70,7 @@ ${texto}`,
       UpdateExpression: "SET #st = :st, nombreCompleto = :n, email = :e, telefono = :t, ciudad = :c, linkedin = :l, tituloProfesional = :tp, habilidades = :h, idiomas = :id, experiencia = :ex, educacion = :edu, tieneExperiencia = :te, updatedAt = :ua",
       ExpressionAttributeNames: { "#st": "status" },
       ExpressionAttributeValues: {
-        ":st": "ready",
+        ":st": estado,
         ":n": data.nombreCompleto ?? "",
         ":e": data.email ?? "",
         ":t": data.telefono ?? "",
@@ -95,6 +105,9 @@ export async function POST(req: NextRequest) {
   const file = formData.get("cv") as File;
   if (!file) return NextResponse.json({ error: "No se recibió archivo" }, { status: 400 });
 
+  const nombreEsperado = (formData.get("nombre") as string) ?? "";
+  const apellidoEsperado = (formData.get("apellidoPaterno") as string) ?? "";
+
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
   const key = `clients/${userId}/cv/original.pdf`;
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest) {
     },
   }));
 
-  extraerCV(userId, buffer, key);
+  extraerCV(userId, buffer, key, nombreEsperado, apellidoEsperado);
 
   return NextResponse.json({ ok: true, key });
 }

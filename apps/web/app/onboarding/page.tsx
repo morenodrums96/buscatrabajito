@@ -39,8 +39,11 @@ export default function Onboarding() {
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [cvMismatch, setCvMismatch] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [verificandoAcceso, setVerificandoAcceso] = useState(true);
 
   // Partículas memorizadas para evitar recrear instancias en cada render
   const particles = useMemo(() => Array.from({ length: 6 }), []);
@@ -50,6 +53,30 @@ export default function Onboarding() {
   useEffect(() => {
     localStorage.removeItem(TOUR_KEY);
   }, []);
+
+  // Si el usuario ya completó el onboarding anteriormente, no debe poder
+  // volver a entrar escribiendo /onboarding directamente en el navegador.
+  useEffect(() => {
+    let cancelado = false;
+
+    fetch("/api/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelado) return;
+        if (data?.onboardingCompletado) {
+          router.replace("/dashboard");
+          return;
+        }
+        setVerificandoAcceso(false);
+      })
+      .catch(() => {
+        if (!cancelado) setVerificandoAcceso(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [router]);
 
   // Auto-capitalizar la primera letra solo una vez por campo: si el usuario
   // borra esa mayúscula y vuelve a escribir en minúscula, ya no se vuelve a forzar.
@@ -109,6 +136,10 @@ export default function Onboarding() {
   // Secuencia de cierre tras subir el CV, antes de entrar al dashboard
   useEffect(() => {
     if (step === "finalizando") {
+      // Marcamos el onboarding como completado para que no se pueda volver
+      // a entrar a /onboarding una vez que ya se llegó a esta pantalla.
+      fetch("/api/onboarding/completar", { method: "POST" }).catch(() => {});
+
       const interval = setInterval(() => {
         setFraseIndex((prev) => {
           if (prev < FRASES_FINALIZANDO.length - 1) {
@@ -157,30 +188,98 @@ export default function Onboarding() {
     }
   }
 
+  type ResultadoCV = { status: "ready" } | { status: "mismatch"; nombreExtraido: string };
+
+  async function esperarProcesamientoCV(): Promise<ResultadoCV> {
+    // El análisis del CV corre en segundo plano; consultamos su estado
+    // hasta que termine (ready), no coincida con la persona (mismatch) o
+    // falle (error).
+    const maxIntentos = 30; // ~60s
+    for (let intento = 0; intento < maxIntentos; intento++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const res = await fetch("/api/cv/perfil");
+      const data = await res.json();
+
+      if (data?.status === "ready") return { status: "ready" };
+
+      if (data?.status === "mismatch") {
+        return { status: "mismatch", nombreExtraido: (data.nombreCompleto ?? "").trim() };
+      }
+
+      if (data?.status === "error") {
+        throw new Error("No pudimos leer ese archivo. Intenta con otro PDF.");
+      }
+      // status === "processing": seguimos esperando
+    }
+    throw new Error("El análisis está tardando más de lo esperado. Intenta de nuevo.");
+  }
+
   async function handleCVUpload(file: File) {
     setUploading(true);
     setErrorMsg(null);
+    setCvMismatch(null);
 
     try {
       const formData = new FormData();
       formData.append("cv", file);
+      formData.append("nombre", nombre);
+      formData.append("apellidoPaterno", apellidoPaterno);
       const res = await fetch("/api/cv/subir", { method: "POST", body: formData });
 
       if (!res.ok) throw new Error("No se pudo subir el archivo.");
 
+      const resultado = await esperarProcesamientoCV();
+
+      if (resultado.status === "mismatch") {
+        setCvMismatch(resultado.nombreExtraido || "otra persona");
+        return;
+      }
+
       setFraseIndex(0);
       setStep("finalizando");
     } catch (err) {
-      console.error(err);
-      setErrorMsg("Error al subir el CV. Intenta subir un archivo PDF válido.");
+      console.warn(err);
+      setErrorMsg(
+        err instanceof Error ? err.message : "Error al subir el CV. Intenta subir un archivo PDF válido."
+      );
     } finally {
       setUploading(false);
     }
   }
 
+  async function confirmarCVDeTodasFormas() {
+    setConfirmando(true);
+    try {
+      const res = await fetch("/api/cv/confirmar", { method: "POST" });
+      if (!res.ok) throw new Error("No se pudo confirmar el CV.");
+      setCvMismatch(null);
+      setFraseIndex(0);
+      setStep("finalizando");
+    } catch (err) {
+      console.warn(err);
+      setErrorMsg("No se pudo confirmar tu CV. Intenta de nuevo.");
+    } finally {
+      setConfirmando(false);
+    }
+  }
+
+  function subirOtroCV() {
+    setCvMismatch(null);
+    setErrorMsg(null);
+  }
+
+  if (verificandoAcceso) {
+    return (
+      <div className="min-h-screen w-full bg-[#030712] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-sky-400 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-[#030712] text-slate-100 flex items-center justify-center p-4 relative overflow-hidden select-none">
-      
+
       {/* EFECTOS DE FONDO */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
 
@@ -450,44 +549,86 @@ export default function Onboarding() {
                 </div>
               )}
 
-              <div className="space-y-3">
-                <label className="group relative flex items-center justify-center gap-3 w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold rounded-2xl text-sm transition-all shadow-[0_0_25px_rgba(56,189,248,0.3)] cursor-pointer overflow-hidden">
-                  {uploading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin text-white" />
-                      <span>Subiendo y analizando CV...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                      <span>Sí, subir mi CV (PDF)</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    disabled={uploading}
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleCVUpload(file);
-                    }}
-                  />
-                </label>
+              {cvMismatch ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs flex items-start gap-2 text-left">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>
+                      Este CV parece pertenecer a <strong>&quot;{cvMismatch}&quot;</strong>, no a{" "}
+                      {nombre || "ti"}. ¿Deseas continuar de todas formas o subir otro archivo?
+                    </span>
+                  </div>
 
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => {
-                    setFraseIndex(0);
-                    setStep("finalizando");
-                  }}
-                  className="flex items-center justify-center gap-2 w-full py-4 px-6 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 hover:text-white font-semibold rounded-2xl text-sm transition-all cursor-pointer"
-                >
-                  <FilePlus className="w-4 h-4 text-slate-400" />
-                  <span>No tengo CV — Crearlo con IA</span>
-                </button>
-              </div>
+                  <div className="space-y-3">
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      type="button"
+                      disabled={confirmando}
+                      onClick={confirmarCVDeTodasFormas}
+                      className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold rounded-xl text-sm transition-all shadow-[0_0_25px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                    >
+                      {confirmando ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Confirmando...</span>
+                        </>
+                      ) : (
+                        <span>Sí, es mi CV — continuar</span>
+                      )}
+                    </motion.button>
+
+                    <button
+                      type="button"
+                      disabled={confirmando}
+                      onClick={subirOtroCV}
+                      className="flex items-center justify-center gap-2 w-full py-3.5 px-6 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 hover:text-white font-semibold rounded-xl text-sm transition-all cursor-pointer"
+                    >
+                      <UploadCloud className="w-4 h-4 text-slate-400" />
+                      <span>No, subir otro CV</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <label className="group relative flex items-center justify-center gap-3 w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold rounded-2xl text-sm transition-all shadow-[0_0_25px_rgba(56,189,248,0.3)] cursor-pointer overflow-hidden">
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin text-white" />
+                        <span>Subiendo y analizando CV...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        <span>Sí, subir mi CV (PDF)</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      disabled={uploading}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCVUpload(file);
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => {
+                      setFraseIndex(0);
+                      setStep("finalizando");
+                    }}
+                    className="flex items-center justify-center gap-2 w-full py-4 px-6 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 hover:text-white font-semibold rounded-2xl text-sm transition-all cursor-pointer"
+                  >
+                    <FilePlus className="w-4 h-4 text-slate-400" />
+                    <span>No tengo CV — Crearlo con IA</span>
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
