@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -10,27 +10,37 @@ export async function POST(req: NextRequest) {
 
   const { cvData } = await req.json();
 
-  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" });
-
-  const prompt = `Eres un experto en reclutamiento en México y LATAM. Analiza este perfil profesional y sugiere entre 4 y 6 puestos de trabajo a los que esta persona puede aplicar exitosamente.
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Eres un experto en reclutamiento en México y LATAM. Responde SOLO con un JSON array de strings, sin markdown, sin texto adicional.",
+      },
+      {
+        role: "user",
+        content: `Analiza este perfil profesional y sugiere entre 4 y 6 puestos de trabajo reales que aparecen en OCC, LinkedIn y Computrabajo en México.
 
 Perfil:
 - Habilidades: ${cvData.habilidades?.join(", ")}
 - Experiencia: ${cvData.experiencia?.map((e: { puesto: string; empresa: string }) => `${e.puesto} en ${e.empresa}`).join(", ")}
 - Educación: ${cvData.educacion?.map((e: { carrera: string }) => e.carrera).join(", ")}
-- Título/Área: ${cvData.tituloProfesional}
-- Tiene experiencia laboral: ${cvData.tieneExperiencia}
+- Área: ${cvData.tituloProfesional}
+- Tiene experiencia: ${cvData.tieneExperiencia}
 
-Responde SOLO con un JSON array de strings, sin texto adicional, sin markdown:
-["Puesto 1", "Puesto 2", "Puesto 3", "Puesto 4"]
+Si no tiene experiencia laboral, sugiere puestos junior o de entrada.
+Responde solo con: ["Puesto 1", "Puesto 2", "Puesto 3", "Puesto 4"]`,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 200,
+  });
 
-Los puestos deben ser nombres reales de vacantes que aparecen en OCC, LinkedIn y Computrabajo en México. Si no tiene experiencia, sugiere puestos junior o de entrada.`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim().replace(/```json|```/g, "").trim();
+  const text = response.choices[0].message.content?.trim() ?? "";
+  const clean = text.replace(/```json|```/g, "").trim();
 
   try {
-    const puestos = JSON.parse(text);
+    const puestos = JSON.parse(clean);
     return NextResponse.json({ puestos });
   } catch {
     return NextResponse.json({ puestos: [] }, { status: 500 });

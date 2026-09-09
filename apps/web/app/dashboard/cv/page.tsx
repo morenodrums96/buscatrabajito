@@ -41,7 +41,7 @@ interface CVData {
   tieneExperiencia: boolean;
 }
 
-type Step = "idle" | "uploading" | "confirmar" | "busqueda" | "listo";
+type Step = "idle" | "uploading" | "confirmar" | "busqueda" | "listo" | "procesando";
 
 const SEGUNDOS_REDIRECCION = 5;
 
@@ -75,7 +75,30 @@ export default function CVPage() {
     fetch("/api/cv/perfil")
       .then((r) => r.json())
       .then((data) => {
-        if (data?.nombreCompleto) {
+        if (!data) return; // No hay CV aún
+
+        if (data.status === "processing") {
+          // Mostrar pantalla de carga y reintentar cada 3 segundos
+          setStep("procesando");
+          const interval = setInterval(() => {
+            fetch("/api/cv/perfil")
+              .then((r) => r.json())
+              .then((d) => {
+                if (d?.status === "ready") {
+                  clearInterval(interval);
+                  setCvData(d);
+                  setFileName("CV guardado");
+                  setStep("confirmar");
+                } else if (d?.status === "error") {
+                  clearInterval(interval);
+                  setStep("idle");
+                }
+              });
+          }, 3000);
+          return () => clearInterval(interval);
+        }
+
+        if (data.status === "ready" && data.nombreCompleto) {
           setCvData(data);
           setFileName("CV guardado");
           setStep("confirmar");
@@ -188,10 +211,12 @@ export default function CVPage() {
                 step === "idle" ? "cursor-pointer group" : "cursor-default"
               } ${dragOver ? "border-[#2563EB] bg-blue-50/40" : "border-slate-200 hover:border-[#2563EB]/50 bg-slate-50/50 hover:bg-blue-50/20"}`}
             >
-              {step === "uploading" ? (
+              {step === "uploading" || step === "procesando" ? (
                 <div className="py-2">
                   <Loader2 className="w-9 h-9 text-[#2563EB] mx-auto mb-3 animate-spin" />
-                  <p className="font-bold text-xs text-[#0F2744] mb-1">Analizando {fileName}...</p>
+                  <p className="font-bold text-xs text-[#0F2744] mb-1">
+                    {step === "procesando" ? "Analizando tu CV..." : `Analizando ${fileName}...`}
+                  </p>
                   <p className="text-[11px] text-slate-400">La IA está extrayendo tu información profesional</p>
                 </div>
               ) : step !== "idle" ? (
@@ -253,6 +278,21 @@ export default function CVPage() {
           </div>
         </div>
       </div>
+
+      {/* ── PROCESANDO CV EN SEGUNDO PLANO ── */}
+      {step === "procesando" && (
+        <div className="bg-white border border-slate-200/80 rounded-xl p-16 shadow-sm text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-10 h-10 border-4 border-[#2563EB]/20 border-t-[#2563EB] rounded-full animate-spin" />
+          </div>
+          <h2 className="font-extrabold text-base text-[#0F2744] mb-2" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
+            Estamos analizando tu CV...
+          </h2>
+          <p className="text-xs text-slate-500">
+            Nuestra IA está extrayendo tu información. Esto puede tardar unos segundos.
+          </p>
+        </div>
+      )}
 
       {/* ── CONFIRMACIÓN DE DATOS ── */}
       {step === "confirmar" && cvData && (
@@ -506,7 +546,7 @@ export default function CVPage() {
       </AnimatePresence>
 
       {/* Historial de CVs */}
-      {step !== "confirmar" && step !== "busqueda" && step !== "listo" && (
+      {step !== "confirmar" && step !== "busqueda" && step !== "listo" && step !== "procesando" && (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
           <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
             <h2 className="font-extrabold text-xs text-[#0F2744] uppercase tracking-wider">

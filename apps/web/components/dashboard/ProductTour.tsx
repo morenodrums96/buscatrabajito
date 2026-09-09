@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, ChevronRight } from "lucide-react";
 
@@ -62,6 +62,7 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ top: 0, left: 0 });
+  const [ready, setReady] = useState(false);
 
   const step = TOUR_STEPS[stepIndex];
 
@@ -106,19 +107,39 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
   }, [step]);
 
   useEffect(() => {
-    // Reintentar posicionamiento por si la animación de render de la página toma un momento
-    calcPositions();
-    const timer = setTimeout(calcPositions, 100);
-
     window.addEventListener("resize", calcPositions);
     window.addEventListener("scroll", calcPositions, true);
 
+    // En el primer paso, el contenido del dashboard aún puede estar con su
+    // animación de entrada / fuentes asentándose: esperamos un momento antes
+    // de calcular y mostrar el tour, para que no "salte" a su posición final.
+    if (stepIndex === 0 && !ready) {
+      const settle = setTimeout(() => {
+        calcPositions();
+        setReady(true);
+      }, 500);
+      return () => {
+        clearTimeout(settle);
+        window.removeEventListener("resize", calcPositions);
+        window.removeEventListener("scroll", calcPositions, true);
+      };
+    }
+
+    // Pasos siguientes: los elementos objetivo (sidebar, etc.) ya están
+    // estables, así que se puede calcular casi de inmediato.
+    const immediate = setTimeout(() => {
+      calcPositions();
+      setReady(true);
+    }, 0);
+    const timer = setTimeout(calcPositions, 100);
+
     return () => {
+      clearTimeout(immediate);
       clearTimeout(timer);
       window.removeEventListener("resize", calcPositions);
       window.removeEventListener("scroll", calcPositions, true);
     };
-  }, [calcPositions, stepIndex]);
+  }, [calcPositions, stepIndex, ready]);
 
   function finish() {
     localStorage.setItem(TOUR_KEY, "1");
@@ -134,6 +155,8 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
   }
 
   const isLast = stepIndex === TOUR_STEPS.length - 1;
+
+  if (!ready) return null;
 
   return (
     <AnimatePresence>
