@@ -10,16 +10,20 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const { nombre, apellidos } = await req.json();
+  const { nombre, apellidoPaterno, apellidoMaterno, telefono } = await req.json();
   if (!nombre?.trim()) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+
+  const nombreCompleto = `${nombre.trim()} ${apellidoPaterno?.trim() ?? ""}`.trim();
 
   await db.send(new UpdateCommand({
     TableName: "buscatrabajito-users",
     Key: { PK: `USER#${userId}`, SK: "SEARCH_PROFILE" },
-    UpdateExpression: "SET nombreCompleto = :n, apellidos = :a",
+    UpdateExpression: "SET nombreCompleto = :n, apellidoPaterno = :ap, apellidoMaterno = :am, telefono = :t",
     ExpressionAttributeValues: {
-      ":n": nombre.trim(),
-      ":a": apellidos?.trim() ?? "",
+      ":n": nombreCompleto,
+      ":ap": apellidoPaterno?.trim() ?? "",
+      ":am": apellidoMaterno?.trim() ?? "",
+      ":t": telefono?.trim() ?? "",
     },
   }));
 

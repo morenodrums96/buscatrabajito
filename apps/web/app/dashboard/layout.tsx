@@ -5,7 +5,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import NombreModal from "@/components/NombreModal";
 import { DashboardContext, DashboardProfile } from "@/components/dashboard/DashboardContext";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -23,7 +22,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [profile, setProfile] = useState<DashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
@@ -40,7 +38,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (data?.nombreCompleto) {
           setDisplayName(data.nombreCompleto);
         } else {
-          setShowModal(true);
           setDisplayName(user.emailAddresses[0]?.emailAddress ?? "");
         }
         setLoading(false);
@@ -58,15 +55,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans">
-      {showModal && !signingOut && (
-        <NombreModal
-          onComplete={(nombre) => {
-            setDisplayName(nombre);
-            setShowModal(false);
-          }}
-        />
-      )}
-
       <DashboardSidebar
         pathname={pathname}
         isFreePlan={plan === "free"}

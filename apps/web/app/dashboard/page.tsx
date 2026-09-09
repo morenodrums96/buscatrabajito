@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { Search, Bell, FileText, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Search,
+  Bell,
+  FileText,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 import { useDashboard } from "@/components/dashboard/DashboardContext";
 
 interface Perfil {
@@ -17,21 +27,28 @@ export default function Dashboard() {
   const { profile, displayName, plan } = useDashboard();
   const [diasActivo] = useState(() =>
     profile?.createdAt
-      ? Math.max(1, Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / 86400000))
+      ? Math.max(
+          1,
+          Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / 86400000)
+        )
       : 1
   );
   const [perfiles, setPerfiles] = useState<Perfil[]>([]);
+  const [loadingPerfiles, setLoadingPerfiles] = useState(true);
 
   useEffect(() => {
     fetch("/api/perfiles")
       .then((r) => r.json())
-      .then((data) => setPerfiles(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .then((data) => {
+        setPerfiles(Array.isArray(data) ? data : []);
+        setLoadingPerfiles(false);
+      })
+      .catch(() => setLoadingPerfiles(false));
   }, []);
 
   return (
-    <>
-      {/* Banner de Saludo estilo Fintech */}
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Banner de Saludo */}
       <div className="flex items-center justify-between">
         <div>
           <h1
@@ -41,12 +58,42 @@ export default function Dashboard() {
             Bienvenido, {profile?.nombreCompleto ?? displayName}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Última actualización de vacantes: Hace 12 minutos
+            Última actualización de vacantes: Hace unos momentos
           </p>
         </div>
       </div>
 
-      {/* Métricas estilo "yotepresto" (Compactas con tipografía numérica fuerte) */}
+      {/* ── BANNER DE AUTOAYUDA / GUIADO INICIAL ── */}
+      {!loadingPerfiles && perfiles.length === 0 && (
+        <div className="bg-gradient-to-r from-blue-900 via-[#0F2744] to-slate-900 text-white rounded-2xl p-6 shadow-md relative overflow-hidden transition-all duration-500">
+          <div className="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-[11px] font-bold text-blue-300">
+                <Sparkles className="w-3 h-3 text-blue-400" /> Siguiente paso recomendado
+              </div>
+              <h3
+                className="text-base font-bold text-white tracking-tight"
+                style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+              >
+                Configura tus Preferencias de Búsqueda
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Ya guardaste tu CV base. Ahora define los puestos, estados y modalidades requeridas para activar el rastreador de vacantes en tiempo real.
+              </p>
+            </div>
+
+            <Link
+              href="/dashboard/cv"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-600/30 flex-shrink-0 active:scale-95"
+            >
+              Ir a Configurar Mi CV <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Vacantes encontradas", value: "0", sub: "esta semana", icon: Search },
@@ -56,7 +103,7 @@ export default function Dashboard() {
         ].map((m, i) => {
           const Icon = m.icon;
           return (
-            <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm">
+            <div key={i} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm hover:border-slate-300 transition-colors">
               <div className="flex items-center justify-between text-slate-400 mb-2">
                 <span className="text-xs font-semibold text-slate-500">{m.label}</span>
                 <Icon className="w-4 h-4 text-slate-400" />
@@ -75,7 +122,7 @@ export default function Dashboard() {
 
       {/* Perfil & Notificaciones en Paneles Divididos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Panel Perfil */}
+        {/* Panel Perfil / Búsquedas */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
             <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
@@ -91,7 +138,7 @@ export default function Dashboard() {
                 <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <span className="text-sm font-semibold text-[#0F2744]">{p.puesto}</span>
                   <span className="text-xs text-slate-500">
-                    {p.estados?.length > 2 ? `${p.estados.slice(0,2).join(", ")} +${p.estados.length - 2}` : p.estados?.join(", ")}
+                    {p.estados?.length > 2 ? `${p.estados.slice(0, 2).join(", ")} +${p.estados.length - 2}` : p.estados?.join(", ")}
                   </span>
                 </div>
               ))}
@@ -100,10 +147,10 @@ export default function Dashboard() {
               )}
             </div>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-xs text-slate-500 mb-3">No tienes búsquedas activas.</p>
-              <Link href="/dashboard/cv" className="inline-block bg-[#2563EB] text-white px-4 py-2 rounded-lg text-xs font-bold">
-                Configurar en Mi CV →
+            <div className="text-center py-6 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+              <p className="text-xs text-slate-500 mb-3">Aún no has activado criterios de búsqueda.</p>
+              <Link href="/dashboard/cv" className="inline-flex items-center gap-1.5 bg-[#2563EB] hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm">
+                <Zap className="w-3.5 h-3.5" /> Configurar en Mi CV
               </Link>
             </div>
           )}
@@ -146,7 +193,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Feed de Vacantes Estilo Tabla/Lista Profesional */}
+      {/* Feed de Vacantes */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
           <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
@@ -166,6 +213,6 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }

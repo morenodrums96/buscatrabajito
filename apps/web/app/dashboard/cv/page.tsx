@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import BusquedaStep from "@/components/BusquedaStep";
 import {
   FileText, Upload, Sparkles, Clock, FileCheck,
@@ -40,7 +43,10 @@ interface CVData {
 
 type Step = "idle" | "uploading" | "confirmar" | "busqueda" | "listo";
 
+const SEGUNDOS_REDIRECCION = 5;
+
 export default function CVPage() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("idle");
@@ -49,6 +55,21 @@ export default function CVPage() {
   const [newSkill, setNewSkill] = useState("");
   const [expandExp, setExpandExp] = useState(true);
   const [expandEdu, setExpandEdu] = useState(true);
+  const [segundosRestantes, setSegundosRestantes] = useState(SEGUNDOS_REDIRECCION);
+
+  useEffect(() => {
+    if (step !== "listo") return;
+    const interval = setInterval(() => {
+      setSegundosRestantes((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step]);
+
+  useEffect(() => {
+    if (step === "listo" && segundosRestantes === 0) {
+      router.push("/dashboard");
+    }
+  }, [step, segundosRestantes, router]);
 
   useEffect(() => {
     fetch("/api/cv/perfil")
@@ -403,20 +424,62 @@ export default function CVPage() {
         <BusquedaStep cvData={cvData as Record<string, unknown> | null} onFinish={() => setStep("listo")} />
       )}
 
-      {/* ── LISTO ── */}
+      {/* ── LISTO CON REDIRECCIÓN SUAVE Y AUTO-AYUDA ── */}
       {step === "listo" && (
-        <div className="bg-white border border-slate-200/80 rounded-xl p-12 shadow-sm text-center">
-          <div className="text-5xl mb-4">🎉</div>
-          <h2 className="font-extrabold text-xl text-[#0F2744] mb-2" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
-            ¡Todo listo!
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="bg-white border border-slate-200/80 rounded-2xl p-10 sm:p-14 shadow-lg text-center max-w-xl mx-auto"
+        >
+          <div className="w-16 h-16 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm">
+            <CheckCircle2 className="w-9 h-9 animate-bounce" />
+          </div>
+
+          <h2
+            className="font-extrabold text-2xl text-[#0F2744] mb-2 tracking-tight"
+            style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
+          >
+            ¡Perfil y CV Guardados con Éxito!
           </h2>
-          <p className="text-slate-500 text-sm max-w-sm mx-auto mb-6">
-            Tu perfil está configurado. Empezamos a buscar vacantes para ti ahora mismo.
+
+          <p className="text-slate-500 text-sm max-w-md mx-auto mb-6 leading-relaxed">
+            Tu información ha sido optimizada para ATS. Estamos escaneando automáticamente las mejores ofertas según tu perfil.
           </p>
-          <a href="/dashboard" className="inline-block px-8 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-all">
-            Ir al dashboard →
-          </a>
-        </div>
+
+          {/* Tarjeta Guía del Siguiente Paso */}
+          <div className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-4 mb-6 text-left flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-[#2563EB] flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-slate-700 space-y-1">
+              <p className="font-bold text-[#0F2744]">💡 ¿Qué sigue ahora?</p>
+              <p className="text-slate-600">
+                En tu Panel Principal verás el radar de búsquedas en tiempo real y podrás ajustar tus alertas por correo o WhatsApp.
+              </p>
+            </div>
+          </div>
+
+          {/* Barra + contador de auto-redirección */}
+          <div className="mb-6">
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-[#2563EB] rounded-full transition-[width] duration-1000 ease-linear"
+                style={{ width: `${((SEGUNDOS_REDIRECCION - segundosRestantes) / SEGUNDOS_REDIRECCION) * 100}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              Te llevaremos al dashboard en {segundosRestantes}s...
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/dashboard"
+              className="w-full sm:w-auto px-7 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-500/20 active:scale-95"
+            >
+              Ir al Dashboard ahora →
+            </Link>
+          </div>
+        </motion.div>
       )}
 
       {/* Historial de CVs */}
