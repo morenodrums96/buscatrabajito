@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { TOUR_KEY } from "@/components/dashboard/ProductTour";
 import {
   Sparkles,
   UploadCloud,
@@ -43,6 +44,12 @@ export default function Onboarding() {
 
   // Partículas memorizadas para evitar recrear instancias en cada render
   const particles = useMemo(() => Array.from({ length: 6 }), []);
+
+  // Cada vez que se entra a onboarding, se reinicia el tour del dashboard,
+  // así siempre vuelve a salir al terminar y llegar a /dashboard.
+  useEffect(() => {
+    localStorage.removeItem(TOUR_KEY);
+  }, []);
 
   // Auto-capitalizar la primera letra solo una vez por campo: si el usuario
   // borra esa mayúscula y vuelve a escribir en minúscula, ya no se vuelve a forzar.

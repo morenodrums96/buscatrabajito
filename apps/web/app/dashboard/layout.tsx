@@ -7,6 +7,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { DashboardContext, DashboardProfile } from "@/components/dashboard/DashboardContext";
+import ProductTour, { useTour } from "@/components/dashboard/ProductTour";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "GRATUITO",
@@ -72,6 +73,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [isLoaded, user, router]);
 
+  const { show: showTour, endTour } = useTour();
+
   async function handleSignOut() {
     setSigningOut(true);
     await signOut();
@@ -128,6 +131,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <DashboardContext.Provider value={{ profile, displayName, setDisplayName, plan }}>
                 {children}
               </DashboardContext.Provider>
+              {showTour && <ProductTour onFinish={endTour} />}
             </motion.div>
           )}
         </AnimatePresence>

@@ -47,7 +47,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div data-tour="dashboard-resumen" className="space-y-6 animate-in fade-in duration-500">
       {/* Banner de Saludo */}
       <div className="flex items-center justify-between">
         <div>
@@ -157,7 +157,7 @@ export default function Dashboard() {
         </div>
 
         {/* Panel Notificaciones */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
+        <div data-tour="notificaciones" className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
             <h2 className="font-extrabold text-sm text-[#0F2744] uppercase tracking-wider">
               Canales de notificación

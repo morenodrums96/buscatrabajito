@@ -19,10 +19,10 @@ interface DashboardSidebarProps {
 }
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Resumen", href: "/dashboard" },
-  { icon: FileText, label: "Mi CV", href: "/dashboard/cv" },
-  { icon: Search, label: "Vacantes", href: "/dashboard/vacantes" },
-  { icon: Settings, label: "Configuración", href: "/dashboard/configuracion" },
+  { icon: LayoutDashboard, label: "Resumen", href: "/dashboard", tour: "sidebar-resumen" },
+  { icon: FileText, label: "Mi CV", href: "/dashboard/cv", tour: "sidebar-cv" },
+  { icon: Search, label: "Vacantes", href: "/dashboard/vacantes", tour: "sidebar-vacantes" },
+  { icon: Settings, label: "Configuración", href: "/dashboard/configuracion", tour: "sidebar-configuracion" },
 ];
 
 export default function DashboardSidebar({
@@ -31,36 +31,33 @@ export default function DashboardSidebar({
   onSignOut,
 }: DashboardSidebarProps) {
   return (
-    <aside className="w-64 bg-[#0B192C] text-white flex flex-col fixed top-0 left-0 bottom-0 z-50 border-r border-slate-800 select-none">
-      {/* ── HEADER LIMPIO DEL BRAND ── */}
+    <aside className="w-64 bg-[#0B192C] text-white flex flex-col fixed top-0 left-0 bottom-0 z-40 border-r border-slate-800 select-none">
+      {/* ── HEADER DEL BRAND ── */}
       <div className="h-16 flex items-center px-6 border-b border-slate-800/80">
         <Link
           href="/"
           className="group flex items-center gap-3 transition-all duration-300"
         >
-          {/* Logo Isotipo Iconográfico */}
           <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-[#1E40AF] via-[#2563EB] to-[#60A5FA] p-0.5 shadow-md shadow-blue-500/20 group-hover:scale-105 group-hover:shadow-blue-500/30 transition-all duration-300">
-            <div className="w-full h-full bg-[#0B192C]/30 rounded-[10px] flex items-center justify-center backdrop-blur-xs">
+            <div className="w-full h-full bg-[#0B192C]/40 rounded-[10px] flex items-center justify-center backdrop-blur-xs">
               <Briefcase className="w-4 h-4 text-white transition-transform group-hover:rotate-6" />
             </div>
-            {/* Punto de brillo superior */}
             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-blue-200 rounded-full blur-[1px]" />
           </div>
 
-          {/* Nombre de la Marca con Animación en Hover */}
           <span
             className="font-extrabold text-lg tracking-tight text-white transition-transform duration-300 group-hover:translate-x-0.5 inline-block"
             style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}
           >
             Busco
-            <span className="text-[#60A5FA] inline-block transition-all duration-300 group-hover:text-blue-300 group-hover:scale-105 origin-left">
+            <span className="text-[#60A5FA] inline-block transition-all duration-300 group-hover:text-blue-300 group-hover:scale-105 origin-left ml-0.5">
               Trabajito
             </span>
           </span>
         </Link>
       </div>
 
-      {/* Navegación Principal */}
+      {/* NAVEGACIÓN PRINCIPAL */}
       <nav className="flex-1 py-6 px-3 space-y-1">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
@@ -69,6 +66,7 @@ export default function DashboardSidebar({
             <Link
               key={item.href}
               href={item.href}
+              data-tour={item.tour}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                 active
                   ? "bg-[#2563EB]/20 text-white border-l-4 border-[#3B82F6] pl-3 shadow-inner"
@@ -86,7 +84,7 @@ export default function DashboardSidebar({
         })}
       </nav>
 
-      {/* Footer / Status / Acciones */}
+      {/* FOOTER / ESTATUS / PLAN */}
       <div className="p-4 border-t border-slate-800/80 bg-[#081220]/80 space-y-3.5">
         {isFreePlan ? (
           <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 space-y-2.5">
@@ -114,6 +112,7 @@ export default function DashboardSidebar({
         )}
 
         <button
+          type="button"
           onClick={onSignOut}
           className="flex items-center justify-between w-full px-3 py-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-xs font-medium transition-all cursor-pointer group"
         >
