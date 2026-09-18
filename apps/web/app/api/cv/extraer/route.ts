@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
   "tieneExperiencia": true
 }
 
+Para "habilidades": lista TODAS las habilidades, herramientas, tecnologías, software, metodologías o certificaciones que se mencionen en el CV como elementos individuales y específicos (ej. "Java", "Spring Boot", "PostgreSQL", "Scrum", "Excel avanzado", "Contabilidad fiscal", "Litigio civil", "Negociación"). No las resumas ni las agrupes en frases genéricas — cada habilidad concreta va como su propio elemento en el arreglo. Esto aplica a cualquier profesión, no solo tecnología.
+
 CV:
 ${texto}`,
       },

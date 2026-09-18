@@ -13,7 +13,6 @@ import {
   Loader2,
   Briefcase,
   User,
-  Phone,
   AlertCircle,
 } from "lucide-react";
 
@@ -32,9 +31,7 @@ export default function Onboarding() {
   const [step, setStep] = useState<Step>("bienvenida");
   const [fraseIndex, setFraseIndex] = useState(0);
 
-  const [nombre, setNombre] = useState("");
-  const [apellidoPaterno, setApellidoPaterno] = useState("");
-  const [apellidoMaterno, setApellidoMaterno] = useState("");
+  const [nombreCompleto, setNombreCompleto] = useState("");
   const [telefono, setTelefono] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -78,39 +75,17 @@ export default function Onboarding() {
     };
   }, [router]);
 
-  // Auto-capitalizar la primera letra solo una vez por campo: si el usuario
-  // borra esa mayúscula y vuelve a escribir en minúscula, ya no se vuelve a forzar.
+  // Auto-capitalizar la primera letra solo una vez: si el usuario borra esa
+  // mayúscula y vuelve a escribir en minúscula, ya no se vuelve a forzar.
   const nombreCapRef = useRef(false);
-  const paternoCapRef = useRef(false);
-  const maternoCapRef = useRef(false);
 
   function handleNombreChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
-    if (!nombreCapRef.current && nombre === "" && val.length > 0) {
+    if (!nombreCapRef.current && nombreCompleto === "" && val.length > 0) {
       nombreCapRef.current = true;
-      setNombre(val.charAt(0).toUpperCase() + val.slice(1));
+      setNombreCompleto(val.charAt(0).toUpperCase() + val.slice(1));
     } else {
-      setNombre(val);
-    }
-  }
-
-  function handlePaternoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
-    if (!paternoCapRef.current && apellidoPaterno === "" && val.length > 0) {
-      paternoCapRef.current = true;
-      setApellidoPaterno(val.charAt(0).toUpperCase() + val.slice(1));
-    } else {
-      setApellidoPaterno(val);
-    }
-  }
-
-  function handleMaternoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
-    if (!maternoCapRef.current && apellidoMaterno === "" && val.length > 0) {
-      maternoCapRef.current = true;
-      setApellidoMaterno(val.charAt(0).toUpperCase() + val.slice(1));
-    } else {
-      setApellidoMaterno(val);
+      setNombreCompleto(val);
     }
   }
 
@@ -170,9 +145,7 @@ export default function Onboarding() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nombre,
-          apellidoPaterno,
-          apellidoMaterno,
+          nombre: nombreCompleto,
           telefono,
         }),
       });
@@ -223,8 +196,7 @@ export default function Onboarding() {
     try {
       const formData = new FormData();
       formData.append("cv", file);
-      formData.append("nombre", nombre);
-      formData.append("apellidoPaterno", apellidoPaterno);
+      formData.append("nombre", nombreCompleto);
       const res = await fetch("/api/cv/subir", { method: "POST", body: formData });
 
       if (!res.ok) throw new Error("No se pudo subir el archivo.");
@@ -430,13 +402,13 @@ export default function Onboarding() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
                     <label className="text-xs font-semibold text-slate-300 block mb-1.5 ml-1">
-                      Nombre <span className="text-sky-400">*</span>
+                      Nombre completo <span className="text-sky-400">*</span>
                     </label>
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="ej. Javier"
-                        value={nombre}
+                        placeholder="ej. Javier Moreno"
+                        value={nombreCompleto}
                         onChange={handleNombreChange}
                         required
                         className="w-full px-4 py-3 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-600 text-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all pl-10"
@@ -445,38 +417,14 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300 block mb-1.5 ml-1">
-                      Apellido Paterno <span className="text-sky-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="ej. Moreno"
-                      value={apellidoPaterno}
-                      onChange={handlePaternoChange}
-                      required
-                      className="w-full px-4 py-3 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-600 text-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300 block mb-1.5 ml-1">
-                      Apellido Materno
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="ej. Rojas"
-                      value={apellidoMaterno}
-                      onChange={handleMaternoChange}
-                      className="w-full px-4 py-3 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-600 text-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
-                    />
-                  </div>
-
                   <div className="sm:col-span-2">
                     <label className="text-xs font-semibold text-slate-300 block mb-1.5 ml-1">
                       Número de Teléfono / WhatsApp <span className="text-sky-400">*</span>
                     </label>
                     <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold pointer-events-none">
+                        +52
+                      </span>
                       <input
                         type="tel"
                         inputMode="numeric"
@@ -487,9 +435,8 @@ export default function Onboarding() {
                         pattern="\d{10}"
                         title="Ingresa un número de 10 dígitos"
                         required
-                        className="w-full px-4 py-3 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-600 text-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all pl-10"
+                        className="w-full px-4 py-3 bg-slate-950/70 border border-slate-800 rounded-xl text-white placeholder-slate-600 text-sm outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all pl-12"
                       />
-                      <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                     </div>
                   </div>
                 </div>
@@ -532,7 +479,7 @@ export default function Onboarding() {
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-sky-500 to-transparent" />
 
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                <CheckCircle2 className="w-3.5 h-3.5" /> ¡Casi listo, {nombre || "usuario"}!
+                <CheckCircle2 className="w-3.5 h-3.5" /> ¡Casi listo, {nombreCompleto || "usuario"}!
               </span>
 
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
@@ -555,7 +502,7 @@ export default function Onboarding() {
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>
                       Este CV parece pertenecer a <strong>&quot;{cvMismatch}&quot;</strong>, no a{" "}
-                      {nombre || "ti"}. ¿Deseas continuar de todas formas o subir otro archivo?
+                      {nombreCompleto || "ti"}. ¿Deseas continuar de todas formas o subir otro archivo?
                     </span>
                   </div>
 

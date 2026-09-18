@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { sileo } from "sileo";
 import CVWizard, { CVData } from "@/components/CVWizard";
 import CVCompletionOverlay from "@/components/CVCompletionOverlay";
 import {
@@ -72,16 +73,30 @@ const ESTADOS = [
 ];
 
 const MODALIDADES = [
-  "Presencial",
   "Remoto",
   "Híbrido",
+  "Presencial",
 ];
 
 const TIPOS_TRABAJO = [
   "Tiempo completo",
   "Medio tiempo",
-  "Contrato",
-  "Prácticas",
+  "Freelance / Proyecto",
+  "Prácticas / Becario",
+];
+
+const OPCIONES_DISPONIBILIDAD = [
+  "Inmediata",
+  "1 a 2 semanas",
+  "Más de 1 mes",
+];
+
+const ANIOS_EXPERIENCIA = [
+  "Menos de 1 año",
+  "1–2 años",
+  "3–5 años",
+  "6–10 años",
+  "Más de 10 años",
 ];
 
 const NIVELES_PROFESIONALES = [
@@ -107,8 +122,15 @@ type PageStep =
 
 export default function CVPage() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Última "foto" (en JSON) de los datos tal como están guardados en el
+  // servidor. Comparamos por contenido, no por referencia, para que una
+  // recarga de datos (p. ej. el doble efecto de React en desarrollo) no
+  // se confunda con una edición real del usuario.
+  const snapshotGuardadoRef = useRef<string | null>(null);
 
   const [pageStep, setPageStep] =
     useState<PageStep>("loading");
@@ -123,6 +145,9 @@ export default function CVPage() {
     useState(false);
 
   const [saved, setSaved] =
+    useState(false);
+
+  const [dirty, setDirty] =
     useState(false);
 
   /*
@@ -149,20 +174,14 @@ export default function CVPage() {
   const [nuevoPuesto, setNuevoPuesto] =
     useState("");
 
-  const [tiposTrabajo, setTiposTrabajo] =
-    useState<string[]>(["Tiempo completo"]);
-
   const [nivelProfesional, setNivelProfesional] =
     useState("");
 
-  const [salarioMinimo, setSalarioMinimo] =
+  const [salarioMin, setSalarioMin] =
     useState("");
 
-  const [estadosSeleccionados, setEstadosSeleccionados] =
-    useState<string[]>(["Nuevo León"]);
-
-  const [modalidades, setModalidades] =
-    useState<string[]>([]);
+  const [salarioMax, setSalarioMax] =
+    useState("");
 
   const [remotoUSA, setRemotoUSA] =
     useState(false);
@@ -171,7 +190,7 @@ export default function CVPage() {
     useState(false);
 
   const todoMexico =
-    estadosSeleccionados.length === ESTADOS.length;
+    (cvData?.estadosDeseados?.length ?? 0) === ESTADOS.length;
 
   // ============================================================
   // CARGAR DATOS
@@ -200,7 +219,7 @@ export default function CVPage() {
 
                   setCvData(d);
                   setFileName("CV guardado");
-                  setPageStep("view");
+                  setPageStep(d.confirmado ? "view" : "wizard");
                 } else if (d?.status === "mismatch") {
                   clearInterval(interval);
 
@@ -219,7 +238,8 @@ export default function CVPage() {
 
         if (
           cvItem.status === "ready" &&
-          cvItem.nombreCompleto
+          cvItem.nombreCompleto &&
+          cvItem.confirmado
         ) {
           setCvData(cvItem);
           setFileName("CV guardado");
@@ -248,33 +268,9 @@ export default function CVPage() {
             )
           );
 
-          if (p.estados) {
-            setEstadosSeleccionados(
-              p.estados as string[]
-            );
-          }
-
-          if (p.modalidades) {
-            setModalidades(
-              p.modalidades as string[]
-            );
-          }
-
-          if (p.tiposTrabajo) {
-            setTiposTrabajo(
-              p.tiposTrabajo as string[]
-            );
-          }
-
           if (p.nivelProfesional) {
             setNivelProfesional(
               p.nivelProfesional as string
-            );
-          }
-
-          if (p.salarioMinimo) {
-            setSalarioMinimo(
-              String(p.salarioMinimo)
             );
           }
 
@@ -289,12 +285,110 @@ export default function CVPage() {
               p.aceptaNivelInferior as boolean
             );
           }
+        } else if (
+          Array.isArray(cvItem.puestosDeseados) &&
+          cvItem.puestosDeseados.length > 0
+        ) {
+          // Sin perfiles guardados aún: partimos de los puestos
+          // que ya se eligieron en el wizard de preferencias.
+          setPerfiles(
+            cvItem.puestosDeseados.map(
+              (puesto: string, i: number) => ({
+                puesto,
+                activo: true,
+                prioridad: i + 1,
+              })
+            )
+          );
+        }
+
+        // El rango salarial vive en el propio CV (cvData.salarioDeseado),
+        // que ya llena el wizard de preferencias laborales.
+        const salarioMatch = (cvItem.salarioDeseado as string ?? "").match(
+          /\d[\d,]*/g
+        );
+
+        if (salarioMatch) {
+          setSalarioMin(salarioMatch[0]?.replace(/,/g, "") ?? "");
+          setSalarioMax(salarioMatch[1]?.replace(/,/g, "") ?? "");
         }
       })
       .catch(() => {
         setPageStep("wizard");
       });
   }, []);
+
+  // ============================================================
+  // DETECTAR CAMBIOS SIN GUARDAR
+  // ============================================================
+
+  useEffect(() => {
+    if (pageStep !== "view") return;
+
+    const snapshot = JSON.stringify([
+      cvData,
+      perfiles,
+      nivelProfesional,
+      salarioMin,
+      salarioMax,
+      remotoUSA,
+      aceptaNivelInferior,
+    ]);
+
+    if (snapshotGuardadoRef.current === null) {
+      // Primera vez que tenemos datos en la pantalla "view": la tomamos
+      // como línea base, no cuenta como cambio del usuario.
+      snapshotGuardadoRef.current = snapshot;
+      setDirty(false);
+      return;
+    }
+
+    setDirty(snapshot !== snapshotGuardadoRef.current);
+  }, [pageStep, cvData, perfiles, nivelProfesional, salarioMin, salarioMax, remotoUSA, aceptaNivelInferior]);
+
+  // Avisa al cerrar/recargar la pestaña si hay cambios sin guardar.
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () =>
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+
+  // Avisa al navegar a otra sección del sitio (sidebar, header, etc.)
+  // si hay cambios sin guardar en esta pantalla.
+  useEffect(() => {
+    if (!dirty) return;
+
+    function handleClick(e: MouseEvent) {
+      const link = (e.target as HTMLElement)?.closest("a");
+      if (!link) return;
+
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("#") || href === pathname) return;
+
+      // Bloqueamos la navegación y la dejamos en manos del botón del
+      // toast: los toasts no pueden pausar la ejecución como un confirm().
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      sileo.warning({
+        title: "Tienes cambios sin guardar",
+        description: "Si sales ahora, perderás los cambios que no has guardado.",
+        button: {
+          title: "Salir sin guardar",
+          onClick: () => router.push(href),
+        },
+      });
+    }
+
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [dirty, pathname, router]);
 
   // ============================================================
   // SUBIR PDF
@@ -305,6 +399,23 @@ export default function CVPage() {
       return;
     }
 
+    if (dirty) {
+      sileo.warning({
+        title: "Tienes cambios sin guardar",
+        description:
+          "Si subes un nuevo CV ahora, perderás los cambios que no has guardado.",
+        button: {
+          title: "Continuar de todas formas",
+          onClick: () => procesarSubida(file),
+        },
+      });
+      return;
+    }
+
+    await procesarSubida(file);
+  }
+
+  async function procesarSubida(file: File) {
     setFileName(file.name);
     setPageStep("procesando");
 
@@ -373,6 +484,15 @@ export default function CVPage() {
      */
     setCvData(data);
 
+    // Mantenemos el rango de salario local sincronizado con lo que se
+    // acaba de guardar en el wizard, para que esta pantalla no se quede
+    // mostrando un rango viejo.
+    const salarioMatch = (data.salarioDeseado ?? "").match(/\d[\d,]*/g);
+    const nuevoSalarioMin = salarioMatch?.[0]?.replace(/,/g, "") ?? "";
+    const nuevoSalarioMax = salarioMatch?.[1]?.replace(/,/g, "") ?? "";
+    setSalarioMin(nuevoSalarioMin);
+    setSalarioMax(nuevoSalarioMax);
+
     setShowCompletionOverlay(true);
 
     /*
@@ -392,6 +512,19 @@ export default function CVPage() {
       }),
     }).finally(() => {
       setSaving(false);
+      setDirty(false);
+
+      // Esto queda como la nueva línea base "guardada": el próximo
+      // cambio real del usuario sí debe marcarse como pendiente.
+      snapshotGuardadoRef.current = JSON.stringify([
+        data,
+        perfiles,
+        nivelProfesional,
+        nuevoSalarioMin,
+        nuevoSalarioMax,
+        remotoUSA,
+        aceptaNivelInferior,
+      ]);
     });
   }
 
@@ -412,13 +545,13 @@ export default function CVPage() {
         .map(p => ({
           puesto: p.puesto,
           prioridad: p.prioridad,
-          estados: estadosSeleccionados,
+          estados: cvData.estadosDeseados ?? [],
           remotoUSA,
-          modalidades,
-          tiposTrabajo,
+          modalidades: cvData.modalidadDeseada ?? [],
+          tiposTrabajo: cvData.tipoJornada ?? [],
           nivelProfesional,
-          salarioMinimo: salarioMinimo
-            ? parseInt(salarioMinimo)
+          salarioMinimo: salarioMin
+            ? parseInt(salarioMin)
             : null,
           aceptaNivelInferior,
         }));
@@ -436,6 +569,19 @@ export default function CVPage() {
 
     setSaving(false);
     setSaved(true);
+    setDirty(false);
+
+    // Nueva línea base "guardada" contra la que se compararán los
+    // próximos cambios.
+    snapshotGuardadoRef.current = JSON.stringify([
+      cvData,
+      perfiles,
+      nivelProfesional,
+      salarioMin,
+      salarioMax,
+      remotoUSA,
+      aceptaNivelInferior,
+    ]);
 
     setTimeout(() => {
       setSaved(false);
@@ -553,35 +699,82 @@ export default function CVPage() {
   // ============================================================
 
   function toggleEstado(e: string) {
-    setEstadosSeleccionados(prev =>
-      prev.includes(e)
-        ? prev.filter(x => x !== e)
-        : [...prev, e]
-    );
+    setCvData(d => {
+      if (!d) return d;
+
+      const actuales = d.estadosDeseados ?? [];
+
+      return {
+        ...d,
+        estadosDeseados: actuales.includes(e)
+          ? actuales.filter(x => x !== e)
+          : [...actuales, e],
+      };
+    });
   }
 
   function toggleTodoMexico() {
-    setEstadosSeleccionados(
-      todoMexico
-        ? []
-        : [...ESTADOS]
+    setCvData(d =>
+      d
+        ? {
+            ...d,
+            estadosDeseados: todoMexico ? [] : [...ESTADOS],
+          }
+        : d
     );
   }
 
   function toggleModalidad(m: string) {
-    setModalidades(prev =>
-      prev.includes(m)
-        ? prev.filter(x => x !== m)
-        : [...prev, m]
-    );
+    setCvData(d => {
+      if (!d) return d;
+
+      const actuales = d.modalidadDeseada ?? [];
+
+      return {
+        ...d,
+        modalidadDeseada: actuales.includes(m)
+          ? actuales.filter(x => x !== m)
+          : [...actuales, m],
+      };
+    });
   }
 
+  // El freelance se acuerda directamente con cada empresa, así que no
+  // tiene sentido combinarlo con una modalidad fija (remoto/híbrido/presencial).
   function toggleTipoTrabajo(t: string) {
-    setTiposTrabajo(prev =>
-      prev.includes(t)
-        ? prev.filter(x => x !== t)
-        : [...prev, t]
-    );
+    setCvData(d => {
+      if (!d) return d;
+
+      const actuales = d.tipoJornada ?? [];
+      const seActiva = !actuales.includes(t);
+
+      return {
+        ...d,
+        tipoJornada: seActiva
+          ? [...actuales, t]
+          : actuales.filter(x => x !== t),
+        modalidadDeseada:
+          seActiva && t === "Freelance / Proyecto"
+            ? []
+            : d.modalidadDeseada,
+      };
+    });
+  }
+
+  function actualizarSalario(min: string, max: string) {
+    const formatear = (raw: string) => {
+      const digits = raw.replace(/\D/g, "");
+      return digits ? Number(digits).toLocaleString("es-MX") : "";
+    };
+
+    const minFmt = formatear(min);
+    const maxFmt = formatear(max);
+
+    const partes = [minFmt, maxFmt].filter(Boolean).map(n => `$${n}`);
+    const rango =
+      partes.length === 2 ? `${partes[0]} - ${partes[1]}` : partes[0] ?? "";
+
+    updateField("salarioDeseado", rango ? `${rango} MXN mensual` : "");
   }
 
   function togglePerfil(i: number) {
@@ -702,7 +895,7 @@ export default function CVPage() {
       {/* ====================================================== */}
 
       {pageStep !== "wizard" && (
-        <div className="max-w-6xl mx-auto space-y-6 pb-20 px-4 pt-4">
+        <div className="max-w-6xl mx-auto space-y-6 pb-28 px-4 pt-4">
 
           {/* ================================================== */}
           {/* HEADER                                              */}
@@ -724,8 +917,21 @@ export default function CVPage() {
 
               <button
                 onClick={() => {
-                  setCvData(null);
-                  setFileName(null);
+                  if (dirty) {
+                    sileo.warning({
+                      title: "Tienes cambios sin guardar",
+                      description:
+                        "Si abres el wizard ahora, perderás los cambios que no has guardado.",
+                      button: {
+                        title: "Continuar de todas formas",
+                        onClick: () => setPageStep("wizard"),
+                      },
+                    });
+                    return;
+                  }
+
+                  // No limpiamos cvData: así el wizard abre con los
+                  // datos (y ediciones aún no guardadas) que ya tenías.
                   setPageStep("wizard");
                 }}
                 className="
@@ -861,6 +1067,10 @@ export default function CVPage() {
                         field: "telefono",
                       },
                       {
+                        label: "Estado",
+                        field: "estado",
+                      },
+                      {
                         label: "Ciudad",
                         field: "ciudad",
                       },
@@ -871,6 +1081,10 @@ export default function CVPage() {
                       {
                         label: "Área o Puesto Actual",
                         field: "tituloProfesional",
+                      },
+                      {
+                        label: "Años de experiencia",
+                        field: "aniosExperiencia",
                       },
                     ] as {
                       label: string;
@@ -883,35 +1097,131 @@ export default function CVPage() {
                           {f.label}
                         </label>
 
-                        <input
-                          type="text"
-                          value={
-                            (cvData[
-                              f.field
-                            ] as string) ?? ""
-                          }
-                          onChange={e =>
-                            updateField(
-                              f.field,
-                              e.target.value
-                            )
-                          }
-                          className="
-                            w-full
-                            px-3
-                            py-2
-                            bg-slate-50/50
-                            border
-                            border-slate-200
-                            rounded-xl
-                            text-xs
-                            text-[#0F2744]
-                            focus:bg-white
-                            focus:border-[#2563EB]
-                            outline-none
-                            transition-all
-                          "
-                        />
+                        {f.field === "estado" ? (
+                          <select
+                            value={(cvData.estado as string) ?? ""}
+                            onChange={e =>
+                              updateField("estado", e.target.value)
+                            }
+                            className="
+                              w-full
+                              px-3
+                              py-2
+                              bg-slate-50/50
+                              border
+                              border-slate-200
+                              rounded-xl
+                              text-xs
+                              text-[#0F2744]
+                              focus:bg-white
+                              focus:border-[#2563EB]
+                              outline-none
+                              transition-all
+                            "
+                          >
+                            <option value="">Selecciona tu estado</option>
+                            {ESTADOS.map(estado => (
+                              <option key={estado} value={estado}>
+                                {estado}
+                              </option>
+                            ))}
+                          </select>
+                        ) : f.field === "aniosExperiencia" ? (
+                          <select
+                            value={(cvData.aniosExperiencia as string) ?? ""}
+                            onChange={e =>
+                              updateField(
+                                "aniosExperiencia",
+                                e.target.value
+                              )
+                            }
+                            className="
+                              w-full
+                              px-3
+                              py-2
+                              bg-slate-50/50
+                              border
+                              border-slate-200
+                              rounded-xl
+                              text-xs
+                              text-[#0F2744]
+                              focus:bg-white
+                              focus:border-[#2563EB]
+                              outline-none
+                              transition-all
+                            "
+                          >
+                            <option value="">Selecciona un rango</option>
+                            {ANIOS_EXPERIENCIA.map(anio => (
+                              <option key={anio} value={anio}>
+                                {anio}
+                              </option>
+                            ))}
+                          </select>
+                        ) : f.field === "telefono" ? (
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0F2744] text-xs font-bold pointer-events-none">
+                              +52
+                            </span>
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              value={(cvData.telefono as string) ?? ""}
+                              onChange={e =>
+                                updateField(
+                                  "telefono",
+                                  e.target.value.replace(/\D/g, "").slice(0, 10)
+                                )
+                              }
+                              className="
+                                w-full
+                                pl-9
+                                pr-3
+                                py-2
+                                bg-slate-50/50
+                                border
+                                border-slate-200
+                                rounded-xl
+                                text-xs
+                                text-[#0F2744]
+                                focus:bg-white
+                                focus:border-[#2563EB]
+                                outline-none
+                                transition-all
+                              "
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={
+                              (cvData[
+                                f.field
+                              ] as string) ?? ""
+                            }
+                            onChange={e =>
+                              updateField(
+                                f.field,
+                                e.target.value
+                              )
+                            }
+                            className="
+                              w-full
+                              px-3
+                              py-2
+                              bg-slate-50/50
+                              border
+                              border-slate-200
+                              rounded-xl
+                              text-xs
+                              text-[#0F2744]
+                              focus:bg-white
+                              focus:border-[#2563EB]
+                              outline-none
+                              transition-all
+                            "
+                          />
+                        )}
 
                       </div>
 
@@ -1043,6 +1353,47 @@ export default function CVPage() {
                     </div>
 
                   </div>
+
+                </div>
+
+                {/* ------------------------------------------ */}
+                {/* RESUMEN PROFESIONAL                          */}
+                {/* ------------------------------------------ */}
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-3">
+
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    Resumen Profesional
+                  </h3>
+
+                  <textarea
+                    rows={5}
+                    value={cvData.extractoProfesional ?? ""}
+                    onChange={e =>
+                      updateField(
+                        "extractoProfesional",
+                        e.target.value
+                      )
+                    }
+                    placeholder="Un breve resumen de tu enfoque, logros clave y lo que buscas en tu próximo reto."
+                    className="
+                      w-full
+                      px-3
+                      py-2.5
+                      bg-slate-50/50
+                      border
+                      border-slate-200
+                      rounded-xl
+                      text-xs
+                      text-[#0F2744]
+                      leading-relaxed
+                      resize-none
+                      focus:bg-white
+                      focus:border-[#2563EB]
+                      outline-none
+                      transition-all
+                    "
+                  />
 
                 </div>
 
@@ -1513,6 +1864,66 @@ export default function CVPage() {
                 </div>
 
                 {/* ------------------------------------------ */}
+                {/* ESTADOS DE INTERÉS                           */}
+                {/* ------------------------------------------ */}
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-3">
+
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Estados donde te gustaría trabajar
+                    </h3>
+
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB] cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={todoMexico}
+                        onChange={toggleTodoMexico}
+                        className="w-3.5 h-3.5 accent-[#2563EB]"
+                      />
+                      Todos los estados
+                    </label>
+
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+                    {ESTADOS.map(
+                      e => (
+
+                        <button
+                          key={e}
+                          onClick={() =>
+                            toggleEstado(e)
+                          }
+                          className={`
+                            px-2.5
+                            py-1.5
+                            rounded-lg
+                            text-[11px]
+                            font-semibold
+                            border
+                            transition-all
+                            cursor-pointer
+                            ${
+                              (cvData.estadosDeseados ?? []).includes(e)
+                                ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                : "bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300"
+                            }
+                          `}
+                        >
+                          {e}
+                        </button>
+
+                      )
+                    )}
+
+                  </div>
+
+                </div>
+
+                {/* ------------------------------------------ */}
                 {/* MODALIDAD Y CONTRATO                         */}
                 {/* ------------------------------------------ */}
 
@@ -1522,6 +1933,13 @@ export default function CVPage() {
 
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Modalidad de Trabajo
+                      {(cvData.tipoJornada ?? []).includes(
+                        "Freelance / Proyecto"
+                      ) && (
+                        <span className="ml-2 font-medium text-slate-400 normal-case">
+                          — no aplica para Freelance / Proyecto
+                        </span>
+                      )}
                     </h3>
 
                     <div className="flex flex-wrap gap-2">
@@ -1531,6 +1949,9 @@ export default function CVPage() {
 
                           <button
                             key={m}
+                            disabled={(cvData.tipoJornada ?? []).includes(
+                              "Freelance / Proyecto"
+                            )}
                             onClick={() =>
                               toggleModalidad(m)
                             }
@@ -1543,8 +1964,10 @@ export default function CVPage() {
                               border
                               transition-all
                               cursor-pointer
+                              disabled:opacity-40
+                              disabled:cursor-not-allowed
                               ${
-                                modalidades.includes(
+                                (cvData.modalidadDeseada ?? []).includes(
                                   m
                                 )
                                   ? "bg-[#2563EB] text-white border-[#2563EB]"
@@ -1588,7 +2011,7 @@ export default function CVPage() {
                               transition-all
                               cursor-pointer
                               ${
-                                tiposTrabajo.includes(
+                                (cvData.tipoJornada ?? []).includes(
                                   t
                                 )
                                   ? "bg-[#2563EB] text-white border-[#2563EB]"
@@ -1597,6 +2020,48 @@ export default function CVPage() {
                             `}
                           >
                             {t}
+                          </button>
+
+                        )
+                      )}
+
+                    </div>
+
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Disponibilidad
+                    </h3>
+
+                    <div className="flex flex-wrap gap-2">
+
+                      {OPCIONES_DISPONIBILIDAD.map(
+                        o => (
+
+                          <button
+                            key={o}
+                            onClick={() =>
+                              updateField("disponibilidad", o)
+                            }
+                            className={`
+                              px-3
+                              py-1.5
+                              rounded-xl
+                              text-xs
+                              font-semibold
+                              border
+                              transition-all
+                              cursor-pointer
+                              ${
+                                cvData.disponibilidad === o
+                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300"
+                              }
+                            `}
+                          >
+                            {o}
                           </button>
 
                         )
@@ -1624,21 +2089,17 @@ export default function CVPage() {
 
                     </h3>
 
-                    <div className="flex items-center gap-2">
-
-                      <span className="text-sm font-extrabold text-slate-400">
-                        $
-                      </span>
+                    <div className="grid grid-cols-2 gap-2">
 
                       <input
-                        type="number"
-                        placeholder="25000"
-                        value={salarioMinimo}
-                        onChange={e =>
-                          setSalarioMinimo(
-                            e.target.value
-                          )
-                        }
+                        inputMode="numeric"
+                        placeholder="Desde (Ej. 25000)"
+                        value={salarioMin}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, "");
+                          setSalarioMin(digits);
+                          actualizarSalario(digits, salarioMax);
+                        }}
                         className="
                           w-full
                           px-3
@@ -1654,11 +2115,37 @@ export default function CVPage() {
                         "
                       />
 
-                      <span className="text-xs font-bold text-slate-400">
-                        MXN
-                      </span>
+                      <input
+                        inputMode="numeric"
+                        placeholder="Hasta (Ej. 30000)"
+                        value={salarioMax}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, "");
+                          setSalarioMax(digits);
+                          actualizarSalario(salarioMin, digits);
+                        }}
+                        className="
+                          w-full
+                          px-3
+                          py-2
+                          bg-slate-50
+                          border
+                          border-slate-200
+                          rounded-xl
+                          text-xs
+                          outline-none
+                          focus:bg-white
+                          focus:border-[#2563EB]
+                        "
+                      />
 
                     </div>
+
+                    {cvData.salarioDeseado && (
+                      <p className="text-xs font-bold text-[#2563EB] mt-2">
+                        {cvData.salarioDeseado}
+                      </p>
+                    )}
 
                   </div>
 
@@ -1713,90 +2200,98 @@ export default function CVPage() {
 
                 </div>
 
-                {/* ------------------------------------------ */}
-                {/* GUARDAR                                     */}
-                {/* ------------------------------------------ */}
-
-                <div className="space-y-2 pt-2">
-
-                  <AnimatePresence>
-
-                    {saved && (
-                      <motion.div
-                        initial={{
-                          opacity: 0,
-                          y: -10,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                        }}
-                        className="
-                          flex
-                          items-center
-                          justify-center
-                          gap-2
-                          p-3
-                          bg-emerald-50
-                          border
-                          border-emerald-200
-                          rounded-xl
-                          text-emerald-700
-                          text-xs
-                          font-bold
-                        "
-                      >
-
-                        <CheckCircle2 className="w-4 h-4" />
-
-                        ¡Configuración guardada!
-
-                      </motion.div>
-                    )}
-
-                  </AnimatePresence>
-
-                  <button
-                    onClick={guardarTodo}
-                    disabled={saving}
-                    className="
-                      w-full
-                      py-4
-                      bg-[#0F2744]
-                      hover:bg-slate-800
-                      text-white
-                      font-bold
-                      rounded-2xl
-                      text-xs
-                      flex
-                      items-center
-                      justify-center
-                      gap-2
-                      transition-all
-                      shadow-lg
-                      cursor-pointer
-                      disabled:opacity-50
-                    "
-                  >
-
-                    <Save className="w-4 h-4" />
-
-                    {saving
-                      ? "Guardando..."
-                      : "Guardar Cambios"}
-
-                  </button>
-
-                </div>
-
               </div>
 
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* ====================================================== */}
+      {/* BARRA FLOTANTE DE GUARDADO                              */}
+      {/* ====================================================== */}
+
+      {pageStep === "view" && cvData && (
+        <div
+          className="
+            fixed
+            bottom-0
+            left-0
+            right-0
+            z-40
+            bg-white
+            border-t
+            border-slate-200
+            shadow-[0_-4px_16px_rgba(15,39,68,0.08)]
+            px-4
+            py-3
+          "
+        >
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+
+            <AnimatePresence mode="wait">
+
+              {saved ? (
+                <motion.div
+                  key="saved"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  ¡Configuración guardada!
+                </motion.div>
+              ) : dirty ? (
+                <motion.div
+                  key="dirty"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-1.5 text-amber-600 text-xs font-bold"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Tienes cambios sin guardar
+                </motion.div>
+              ) : (
+                <span key="empty" />
+              )}
+
+            </AnimatePresence>
+
+            <button
+              onClick={guardarTodo}
+              disabled={saving}
+              className="
+                py-3
+                px-6
+                bg-[#0F2744]
+                hover:bg-slate-800
+                text-white
+                font-bold
+                rounded-2xl
+                text-xs
+                flex
+                items-center
+                justify-center
+                gap-2
+                transition-all
+                shadow-lg
+                cursor-pointer
+                disabled:opacity-50
+              "
+            >
+
+              <Save className="w-4 h-4" />
+
+              {saving
+                ? "Guardando..."
+                : "Guardar Cambios"}
+
+            </button>
+
+          </div>
         </div>
       )}
 

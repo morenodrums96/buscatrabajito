@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter, Great_Vibes } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Toaster } from "sileo";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -52,7 +53,10 @@ export default function RootLayout({
         data-scroll-behavior="smooth"
         className={`${plusJakarta.variable} ${inter.variable} ${greatVibes.variable}`}
       >
-        <body>{children}</body>
+        <body>
+          {children}
+          <Toaster position="top-right" theme="light" />
+        </body>
       </html>
     </ClerkProvider>
   );

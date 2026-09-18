@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { agregarHabilidadesAlCatalogo } from "@/lib/skillsCatalog";
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const db = DynamoDBDocumentClient.from(client);
@@ -19,9 +20,16 @@ export async function POST(req: NextRequest) {
       PK: `USER#${userId}`,
       SK: "CV",
       ...cvData,
+      confirmado: true,
       updatedAt: new Date().toISOString(),
     },
   }));
+
+  // Alimentamos el catálogo global de habilidades con lo que el usuario
+  // haya agregado manualmente, para las sugerencias de futuros usuarios.
+  agregarHabilidadesAlCatalogo(cvData?.habilidades ?? []).catch((e) =>
+    console.error("agregarHabilidadesAlCatalogo error:", e)
+  );
 
   // Guardar cada perfil de búsqueda
   for (let i = 0; i < perfiles.length; i++) {

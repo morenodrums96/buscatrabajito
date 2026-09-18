@@ -6,6 +6,7 @@ import { PDFParse } from "pdf-parse";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { nombreCoincide } from "@/lib/nombreCoincide";
+import { agregarHabilidadesAlCatalogo } from "@/lib/skillsCatalog";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const dbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
@@ -49,6 +50,8 @@ async function extraerCV(
   "tieneExperiencia": true
 }
 
+Para "habilidades": lista TODAS las habilidades, herramientas, tecnologías, software, metodologías o certificaciones que se mencionen en el CV como elementos individuales y específicos (ej. "Java", "Spring Boot", "PostgreSQL", "Scrum", "Excel avanzado", "Contabilidad fiscal", "Litigio civil", "Negociación"). No las resumas ni las agrupes en frases genéricas — cada habilidad concreta va como su propio elemento en el arreglo. Esto aplica a cualquier profesión, no solo tecnología.
+
 CV:
 ${texto}`,
         },
@@ -85,6 +88,13 @@ ${texto}`,
         ":ua": new Date().toISOString(),
       },
     }));
+
+    // Alimentamos el catálogo global de habilidades para las sugerencias de
+    // autocompletado de futuros usuarios. Si falla, no debe romper la
+    // extracción del CV.
+    agregarHabilidadesAlCatalogo(data.habilidades ?? []).catch((e) =>
+      console.error("agregarHabilidadesAlCatalogo error:", e)
+    );
   } catch (err) {
     console.error("extraerCV error:", err);
     await db.send(new UpdateCommand({
