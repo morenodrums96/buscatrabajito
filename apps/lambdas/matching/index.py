@@ -37,33 +37,55 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     job_location = job.get("location", "").lower()
 
     puesto_words = [w for w in puesto.split() if len(w) > 3]
-    if not any(word in job_title for word in puesto_words):
+    title_match = any(word in job_title for word in puesto_words)
+    
+    print(f"  puesto={puesto} | title={job_title} | words={puesto_words} | title_match={title_match}")
+    
+    if not title_match:
         return False
 
     estados = profile.get("estados", [])
     remoto_usa = profile.get("remotoUSA", False)
     modalidades = profile.get("modalidades", [])
 
+    print(f"  estados={estados} | location={job_location}")
+
+    # Remoto
     if "Remoto" in modalidades:
         if any(word in job_location for word in ["remoto", "remote", "anywhere"]):
             return True
 
+    # USA
     if remoto_usa and job.get("source") in ["Remotive", "WeWorkRemotely", "Himalayas"]:
         return True
 
+    # Estados — mejorado
     for estado in estados:
-        if estado.lower() in job_location or estado.lower()[:4] in job_location:
+        estado_lower = estado.lower()
+        # Nuevo León → busca "nuevo", "leon", "nl", "monterrey"
+        abreviaturas = {
+            "nuevo león": ["nuevo leon", "nuevo león", "nl", "monterrey", "mty"],
+            "ciudad de méxico": ["cdmx", "df", "ciudad de mexico"],
+            "jalisco": ["jalisco", "guadalajara", "gdl"],
+            "estado de méxico": ["edomex", "estado de mexico", "toluca"],
+        }
+        terminos = abreviaturas.get(estado_lower, [estado_lower, estado_lower[:4]])
+        if any(t in job_location for t in terminos):
+            print(f"  MATCH por estado: {estado}")
             return True
 
+    print(f"  NO MATCH")
     return False
-
 
 def save_match(user_id: str, job: dict):
     table = dynamodb.Table(USERS_TABLE)
     now = int(datetime.now(timezone.utc).timestamp())
+    # SK fija por job_id (no por timestamp): si esta vacante ya se le
+    # había guardado a este usuario, la sobreescribe en vez de duplicarla
+    # (puede pasar si dos corridas del scraper se solapan).
     table.put_item(Item={
         "PK": f"USER#{user_id}",
-        "SK": f"JOB#{now}#{job['job_id']}",
+        "SK": f"JOB#{job['job_id']}",
         "job_id": job["job_id"],
         "title": job["title"],
         "company": job["company"],
