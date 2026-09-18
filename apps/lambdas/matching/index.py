@@ -66,6 +66,16 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     if remoto_usa and job.get("source") in ["Remotive", "WeWorkRemotely", "Himalayas"]:
         return True
 
+    # Si location es genérico "México" sin ciudad/estado, no hay forma de
+    # saber si aplica — se descarta salvo que el usuario acepte remoto.
+    loc_clean = job_location.strip()
+    GENERIC_LOCATIONS = {"méxico", "mexico", "méxico, méxico", "mexico, mexico"}
+    if loc_clean in GENERIC_LOCATIONS:
+        if "Remoto" in modalidades:
+            return True  # podría ser remota
+        print("  NO MATCH (location genérico sin ciudad/estado)")
+        return False
+
     # Estados — comparación sin acentos, para que "Ciudad de México" (con
     # acento, como suele venir en el location real) sí matchee contra
     # "ciudad de mexico"/"cdmx" y viceversa, sin depender de que el
