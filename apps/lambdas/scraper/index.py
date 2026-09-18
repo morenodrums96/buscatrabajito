@@ -37,6 +37,12 @@ USERS_TABLE    = os.environ.get("USERS_TABLE", "buscatrabajito-users")
 EXPIRY_DAYS    = 14
 MAX_TERMS      = 10  # límite para no disparar demasiadas búsquedas por corrida
 
+# Servicio de scraping (ScraperAPI, ZenRows, etc.) para evitar bloqueos de
+# LinkedIn — opcional: si no hay API key configurada, cae de regreso a la
+# petición directa (safe_get) que ya se usaba antes.
+SCRAPER_SERVICE_API_KEY = os.environ.get("SCRAPER_SERVICE_API_KEY", "")
+SCRAPER_SERVICE_URL     = os.environ.get("SCRAPER_SERVICE_URL", "https://api.scraperapi.com")
+
 HEADERS_POOL = [
     {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -297,12 +303,13 @@ def scrape_linkedin(terms: list[str]) -> list[dict]:
     # LinkedIn pagina de a 25 resultados (parámetro start=0,25,50,...).
     # Con la ventana de 14 días puede haber más de una página por
     # término, así que las recorremos hasta que una venga vacía o hasta
-    # este tope, para no disparar el tiempo de corrida.
-    MAX_PAGES = 4
+    # este tope, para no disparar el tiempo de corrida (ni el gasto, si
+    # se está usando un servicio de scraping de pago).
+    MAX_PAGES = 3
     for term in terms:
         for page in range(MAX_PAGES):
             start = page * 25
-            url = (
+            target_url = (
                 "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
                 f"?keywords={requests.utils.quote(term)}"
                 f"&location={requests.utils.quote('Mexico')}"
@@ -313,8 +320,27 @@ def scrape_linkedin(terms: list[str]) -> list[dict]:
                 # esto y el dedupe por job_id sigue evitando avisos repetidos.
                 f"&f_TPR=r1209600&start={start}"
             )
-            r = safe_get(url)
-            if not r:
+
+            # Con API key configurada, la petición pasa por el servicio de
+            # scraping (IP residencial rotativa) para reducir bloqueos de
+            # LinkedIn; sin key, cae de regreso a la petición directa.
+            if SCRAPER_SERVICE_API_KEY:
+                payload = {
+                    "api_key": SCRAPER_SERVICE_API_KEY,
+                    "url": target_url,
+                    "country_code": "mx",
+                    "premium": "true",
+                }
+                try:
+                    r = requests.get(SCRAPER_SERVICE_URL, params=payload, timeout=25)
+                except Exception as e:
+                    print(f"  Error llamando al servicio de scraping [{term}]: {e}")
+                    break
+            else:
+                r = safe_get(target_url)
+
+            if not r or r.status_code != 200:
+                print(f"  LinkedIn: sin resultados para [{term}] en página {page}")
                 break
 
             soup = BeautifulSoup(r.text, "html.parser")
