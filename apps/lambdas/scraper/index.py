@@ -192,12 +192,32 @@ def trigger_matching(new_jobs: list[dict]):
 
 
 # ── Helpers ───────────────────────────────────────────────────────
-def job_id(title: str, company: str) -> str:
-    return hashlib.md5(f"{title.lower().strip()}{company.lower().strip()}".encode()).hexdigest()
+def job_id(title: str, company: str, location: str = "") -> str:
+    # Incluye la ubicación: empresas que republican el mismo puesto en
+    # varias ciudades (común en roles remotos) generan vacantes con el
+    # mismo título+empresa pero relevantes para usuarios distintos según
+    # su estado — sin esto, la segunda ciudad se descartaba como
+    # "ya vista" en cuanto se procesaba la primera.
+    clave = f"{title.lower().strip()}{company.lower().strip()}{location.lower().strip()}"
+    return hashlib.md5(clave.encode()).hexdigest()
 
 
 def random_headers() -> dict:
     return random.choice(HEADERS_POOL)
+
+
+def keywords_from_terms(terms: list[str]) -> list[str]:
+    """Palabras sueltas (>3 letras) de cada término, en vez de exigir la
+    frase completa ("engineering lead") como substring del título — eso
+    descartaba de entrada vacantes como "Lead Backend Engineer" que sí
+    son relevantes. La relevancia fina la vuelve a filtrar matching.py
+    por usuario con la misma lógica de palabra por palabra."""
+    words = set()
+    for term in terms:
+        for word in term.lower().split():
+            if len(word) > 3:
+                words.add(word)
+    return list(words)
 
 
 def is_relevant(title: str, location: str, keywords: list[str]) -> bool:
@@ -236,7 +256,7 @@ def safe_get(url: str, timeout: int = 15) -> requests.Response | None:
 
 def scrape_occ(terms: list[str]) -> list[dict]:
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     for term in terms:
         slug = slugify(term)
         if not slug:
@@ -264,7 +284,7 @@ def scrape_occ(terms: list[str]) -> list[dict]:
                 location = loc_el.get_text(strip=True) if loc_el else "México"
                 if title and is_relevant(title, location, keywords):
                     jobs.append({"source": "OCC", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company)})
+                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
             except Exception as e:
                 print(f"  OCC card error: {e}")
     print(f"OCC: {len(jobs)} vacantes encontradas")
@@ -273,40 +293,60 @@ def scrape_occ(terms: list[str]) -> list[dict]:
 
 def scrape_linkedin(terms: list[str]) -> list[dict]:
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
+    # LinkedIn pagina de a 25 resultados (parámetro start=0,25,50,...).
+    # Con la ventana de 14 días puede haber más de una página por
+    # término, así que las recorremos hasta que una venga vacía o hasta
+    # este tope, para no disparar el tiempo de corrida.
+    MAX_PAGES = 4
     for term in terms:
-        url = (
-            "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-            f"?keywords={requests.utils.quote(term)}"
-            f"&location={requests.utils.quote('Mexico')}"
-            f"&f_TPR=r1800&start=0"
-        )
-        r = safe_get(url)
-        if not r:
-            continue
-        soup = BeautifulSoup(r.text, "html.parser")
-        for card in soup.find_all("li"):
-            try:
-                title_el   = card.find("h3")
-                company_el = card.find("h4")
-                link_el    = card.find("a", href=True)
-                loc_el     = card.find(class_="job-search-card__location")
-                title    = title_el.get_text(strip=True)   if title_el   else ""
-                company  = company_el.get_text(strip=True) if company_el else "N/A"
-                link     = link_el["href"].split("?")[0]   if link_el    else ""
-                location = loc_el.get_text(strip=True)     if loc_el     else "México"
-                if title and is_relevant(title, location, keywords):
-                    jobs.append({"source": "LinkedIn", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company)})
-            except Exception as e:
-                print(f"  LinkedIn card error: {e}")
+        for page in range(MAX_PAGES):
+            start = page * 25
+            url = (
+                "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+                f"?keywords={requests.utils.quote(term)}"
+                f"&location={requests.utils.quote('Mexico')}"
+                # f_TPR=r1800 (últimos 30 min) dejaba fuera cualquier vacante
+                # publicada antes de la corrida anterior — con r1209600 (14
+                # días) coincide con la ventana de deduplicación de
+                # job-bot-seen-jobs, así que no perdemos vacantes reales por
+                # esto y el dedupe por job_id sigue evitando avisos repetidos.
+                f"&f_TPR=r1209600&start={start}"
+            )
+            r = safe_get(url)
+            if not r:
+                break
+
+            soup = BeautifulSoup(r.text, "html.parser")
+            cards = soup.find_all("li")
+            if not cards:
+                break  # ya no hay más resultados para este término
+
+            for card in cards:
+                try:
+                    title_el   = card.find("h3")
+                    company_el = card.find("h4")
+                    link_el    = card.find("a", href=True)
+                    loc_el     = card.find(class_="job-search-card__location")
+                    title    = title_el.get_text(strip=True)   if title_el   else ""
+                    company  = company_el.get_text(strip=True) if company_el else "N/A"
+                    link     = link_el["href"].split("?")[0]   if link_el    else ""
+                    location = loc_el.get_text(strip=True)     if loc_el     else "México"
+                    if title and is_relevant(title, location, keywords):
+                        jobs.append({"source": "LinkedIn", "title": title, "company": company,
+                                     "location": location, "link": link, "job_id": job_id(title, company, location)})
+                except Exception as e:
+                    print(f"  LinkedIn card error: {e}")
+
+            if len(cards) < 25:
+                break  # última página parcial
     print(f"LinkedIn: {len(jobs)} vacantes encontradas")
     return jobs
 
 
 def scrape_computrabajo(terms: list[str]) -> list[dict]:
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     for term in terms:
         slug = slugify(term)
         if not slug:
@@ -332,7 +372,7 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
                 location = loc_el.get_text(strip=True) if loc_el else "México"
                 if title and is_relevant(title, location, keywords):
                     jobs.append({"source": "Computrabajo", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company)})
+                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
             except Exception as e:
                 print(f"  Computrabajo card error: {e}")
     print(f"Computrabajo: {len(jobs)} vacantes encontradas")
@@ -341,7 +381,7 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
 
 def scrape_bumeran(terms: list[str]) -> list[dict]:
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     for term in terms:
         slug = slugify(term)
         if not slug:
@@ -367,7 +407,7 @@ def scrape_bumeran(terms: list[str]) -> list[dict]:
                 location = loc_el.get_text(strip=True) if loc_el else "México"
                 if title and is_relevant(title, location, keywords):
                     jobs.append({"source": "Bumeran", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company)})
+                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
             except Exception as e:
                 print(f"  Bumeran card error: {e}")
     print(f"Bumeran: {len(jobs)} vacantes encontradas")
@@ -377,7 +417,7 @@ def scrape_bumeran(terms: list[str]) -> list[dict]:
 def scrape_remotive(terms: list[str]) -> list[dict]:
     """Remotive API JSON pública — no bloquea."""
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     for term in terms:
         url = f"https://remotive.com/api/remote-jobs?search={requests.utils.quote(term)}&limit=50"
         try:
@@ -393,7 +433,7 @@ def scrape_remotive(terms: list[str]) -> list[dict]:
                 link    = job.get("url", "")
                 if title and is_relevant_remote(title, keywords):
                     jobs.append({"source": "Remotive", "title": title, "company": company,
-                                 "location": "Remoto", "link": link, "job_id": job_id(title, company)})
+                                 "location": "Remoto", "link": link, "job_id": job_id(title, company, "Remoto")})
         except Exception as e:
             print(f"  Remotive error [{term}]: {e}")
     print(f"Remotive: {len(jobs)} vacantes encontradas")
@@ -403,7 +443,7 @@ def scrape_remotive(terms: list[str]) -> list[dict]:
 def scrape_weworkremotely(terms: list[str]) -> list[dict]:
     """WeWorkRemotely RSS feed — no bloquea."""
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     rss_feeds = [
         "https://weworkremotely.com/categories/remote-data-science-jobs.rss",
         "https://weworkremotely.com/categories/remote-programming-jobs.rss",
@@ -425,7 +465,7 @@ def scrape_weworkremotely(terms: list[str]) -> list[dict]:
                 link    = item.findtext("link", "").strip()
                 if title_clean and is_relevant_remote(title_clean, keywords):
                     jobs.append({"source": "WeWorkRemotely", "title": title_clean, "company": company_raw,
-                                 "location": "Remoto", "link": link, "job_id": job_id(title_clean, company_raw)})
+                                 "location": "Remoto", "link": link, "job_id": job_id(title_clean, company_raw, "Remoto")})
         except Exception as e:
             print(f"  WWR RSS error: {e}")
     print(f"WeWorkRemotely: {len(jobs)} vacantes encontradas")
@@ -435,7 +475,7 @@ def scrape_weworkremotely(terms: list[str]) -> list[dict]:
 def scrape_himalayas(terms: list[str]) -> list[dict]:
     """Himalayas API JSON pública — no bloquea."""
     jobs = []
-    keywords = [t.lower() for t in terms]
+    keywords = keywords_from_terms(terms)
     for term in terms:
         url = f"https://himalayas.app/api/jobs?q={requests.utils.quote(term)}&limit=50"
         try:
@@ -453,7 +493,7 @@ def scrape_himalayas(terms: list[str]) -> list[dict]:
                 location = job.get("location", "Remoto / México")
                 if title and is_relevant_remote(title, keywords):
                     jobs.append({"source": "Himalayas", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company)})
+                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
         except Exception as e:
             print(f"  Himalayas error [{term}]: {e}")
     print(f"Himalayas: {len(jobs)} vacantes encontradas")
@@ -483,14 +523,12 @@ def main(event=None, context=None):
 
     seen = load_seen()
 
+    # Por ahora solo LinkedIn — OCC, Himalayas y Bumeran están rotos (el
+    # sitio/API les cambió) y Computrabajo/Remotive/WeWorkRemotely se
+    # desactivaron a petición mientras se revisan las demás. Las
+    # funciones siguen abajo, listas para reactivarse cuando se necesite.
     scrapers = [
-        ("OCC",            lambda: scrape_occ(terms)),
-        ("LinkedIn",       lambda: scrape_linkedin(terms)),
-        ("Computrabajo",   lambda: scrape_computrabajo(terms)),
-        ("Bumeran",        lambda: scrape_bumeran(terms)),
-        ("Remotive",       lambda: scrape_remotive(terms)),
-        ("WeWorkRemotely", lambda: scrape_weworkremotely(terms)),
-        ("Himalayas",      lambda: scrape_himalayas(terms)),
+        ("LinkedIn", lambda: scrape_linkedin(terms)),
     ]
 
     all_jobs = []

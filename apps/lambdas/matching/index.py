@@ -1,7 +1,14 @@
 import json
 import os
+import unicodedata
 import boto3
 from datetime import datetime, timezone
+
+
+def strip_accents(text: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
+    )
 
 dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
 ses = boto3.client("ses", region_name="us-east-1")
@@ -59,18 +66,22 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     if remoto_usa and job.get("source") in ["Remotive", "WeWorkRemotely", "Himalayas"]:
         return True
 
-    # Estados — mejorado
+    # Estados — comparación sin acentos, para que "Ciudad de México" (con
+    # acento, como suele venir en el location real) sí matchee contra
+    # "ciudad de mexico"/"cdmx" y viceversa, sin depender de que el
+    # scraper y el usuario escriban los acentos igual.
+    job_location_plain = strip_accents(job_location)
     for estado in estados:
         estado_lower = estado.lower()
-        # Nuevo León → busca "nuevo", "leon", "nl", "monterrey"
         abreviaturas = {
-            "nuevo león": ["nuevo leon", "nuevo león", "nl", "monterrey", "mty"],
+            "nuevo león": ["nuevo leon", "nl", "monterrey", "mty"],
             "ciudad de méxico": ["cdmx", "df", "ciudad de mexico"],
             "jalisco": ["jalisco", "guadalajara", "gdl"],
             "estado de méxico": ["edomex", "estado de mexico", "toluca"],
         }
         terminos = abreviaturas.get(estado_lower, [estado_lower, estado_lower[:4]])
-        if any(t in job_location for t in terminos):
+        terminos_plain = [strip_accents(t) for t in terminos]
+        if any(t in job_location_plain for t in terminos_plain):
             print(f"  MATCH por estado: {estado}")
             return True
 
@@ -165,6 +176,7 @@ def lambda_handler(event, context):
     print(f"[matching] {len(profiles)} perfiles, {len(new_jobs)} vacantes nuevas")
 
     user_matches: dict[str, list] = {}
+    matched_job_ids: dict[str, set] = {}
 
     for profile in profiles:
         pk = profile.get("PK", "")
@@ -173,10 +185,16 @@ def lambda_handler(event, context):
             continue
 
         for job in new_jobs:
+            # Un usuario puede tener varios perfiles/puestos parecidos
+            # (p. ej. "Backend Engineer" y "Technical Lead"); sin este
+            # chequeo, la misma vacante se agregaba una vez por cada
+            # perfil con el que hacía match y salía repetida en el correo.
+            if job["job_id"] in matched_job_ids.get(user_id, set()):
+                continue
+
             if job_matches_profile(job, profile):
-                if user_id not in user_matches:
-                    user_matches[user_id] = []
-                user_matches[user_id].append(job)
+                user_matches.setdefault(user_id, []).append(job)
+                matched_job_ids.setdefault(user_id, set()).add(job["job_id"])
                 save_match(user_id, job)
 
     print(f"[matching] matches para {len(user_matches)} usuarios")
