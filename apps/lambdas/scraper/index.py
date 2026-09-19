@@ -35,7 +35,7 @@ from bs4 import BeautifulSoup
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "job-bot-seen-jobs")
 USERS_TABLE    = os.environ.get("USERS_TABLE", "buscatrabajito-users")
 EXPIRY_DAYS    = 14
-MAX_TERMS      = 10  # límite para no disparar demasiadas búsquedas por corrida
+MAX_TERMS      = 20  # cada perfil ahora aporta varios términos normalizados (antes 1 c/u)
 
 # Servicio de scraping (ScraperAPI, ZenRows, etc.) para evitar bloqueos de
 # LinkedIn — opcional: si no hay API key configurada, cae de regreso a la
@@ -78,33 +78,43 @@ def slugify(text: str) -> str:
 
 
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
-    """Un término por cada puesto distinto que algún usuario tiene guardado."""
+    """Términos de búsqueda de cada perfil guardado. Usa terminos_busqueda
+    (normalizado por IA en inglés/español al guardar el perfil, ver
+    apps/web/app/api/cv/guardar) cuando existe; si un perfil todavía no
+    lo tiene (guardado antes de este cambio), cae de regreso al puesto
+    original recortado."""
     dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     table = dynamodb.Table(USERS_TABLE)
-    puestos = []
+    profiles = []
     try:
         response = table.scan(
             FilterExpression="begins_with(SK, :sk)",
             ExpressionAttributeValues={":sk": "PROFILE#"},
         )
-        puestos = [item.get("puesto", "") for item in response.get("Items", []) if item.get("puesto")]
+        profiles = response.get("Items", [])
         while "LastEvaluatedKey" in response:
             response = table.scan(
                 FilterExpression="begins_with(SK, :sk)",
                 ExpressionAttributeValues={":sk": "PROFILE#"},
                 ExclusiveStartKey=response["LastEvaluatedKey"],
             )
-            puestos.extend(item.get("puesto", "") for item in response.get("Items", []) if item.get("puesto"))
+            profiles.extend(response.get("Items", []))
     except Exception as e:
         print(f"  get_search_terms error: {e}")
 
     terminos, vistos = [], set()
-    for puesto in puestos:
-        term = normalize_puesto(puesto)
-        key = term.lower()
-        if term and key not in vistos:
-            vistos.add(key)
-            terminos.append(term)
+    for profile in profiles:
+        candidatos = profile.get("terminos_busqueda") or []
+        if not candidatos:
+            puesto = profile.get("puesto", "")
+            if puesto:
+                candidatos = [normalize_puesto(puesto)]
+
+        for term in candidatos:
+            key = term.lower().strip()
+            if key and key not in vistos:
+                vistos.add(key)
+                terminos.append(term.strip())
 
     return terminos[:max_terms]
 

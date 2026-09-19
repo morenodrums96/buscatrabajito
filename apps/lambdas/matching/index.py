@@ -14,7 +14,35 @@ dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
 ses = boto3.client("ses", region_name="us-east-1")
 
 USERS_TABLE = "buscatrabajito-users"
+CATALOGS_TABLE = "buscatrabajito-catalogs"
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "morenodrums96@gmail.com")
+
+# Cache en memoria de municipios por estado — a nivel de módulo para que
+# también sobreviva entre invocaciones "warm" del mismo contenedor de
+# Lambda, no solo dentro de una ejecución.
+_municipios_cache: dict[str, list[str]] = {}
+
+
+def slugify_estado(estado: str) -> str:
+    # "Nuevo León" -> "nuevo-leon", "Ciudad de México" -> "ciudad-de-mexico"
+    return strip_accents(estado).lower().strip().replace(" ", "-")
+
+
+def get_municipios_por_estado(estado: str) -> list[str]:
+    slug = slugify_estado(estado)
+    if slug in _municipios_cache:
+        return _municipios_cache[slug]
+
+    municipios: list[str] = []
+    try:
+        table = dynamodb.Table(CATALOGS_TABLE)
+        result = table.get_item(Key={"PK": f"STATE#{slug}", "SK": "MUNICIPALITIES"})
+        municipios = result.get("Item", {}).get("municipios", [])
+    except Exception as e:
+        print(f"  get_municipios_por_estado error [{estado}]: {e}")
+
+    _municipios_cache[slug] = municipios
+    return municipios
 
 
 def get_all_profiles() -> list[dict]:
@@ -76,21 +104,16 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
         print("  NO MATCH (location genérico sin ciudad/estado)")
         return False
 
-    # Estados — comparación sin acentos, para que "Ciudad de México" (con
-    # acento, como suele venir en el location real) sí matchee contra
-    # "ciudad de mexico"/"cdmx" y viceversa, sin depender de que el
-    # scraper y el usuario escriban los acentos igual.
+    # Estados — comparación sin acentos contra los municipios reales del
+    # estado (catálogo en DynamoDB), ya que LinkedIn/Computrabajo/etc.
+    # casi siempre traen la ciudad ("Monterrey, Nuevo León, México") y no
+    # el nombre del estado. También se compara contra el nombre del
+    # estado por si el location viene sin ciudad (ej. "Nuevo León, México").
     job_location_plain = strip_accents(job_location)
     for estado in estados:
-        estado_lower = estado.lower()
-        abreviaturas = {
-            "nuevo león": ["nuevo leon", "nl", "monterrey", "mty"],
-            "ciudad de méxico": ["cdmx", "df", "ciudad de mexico"],
-            "jalisco": ["jalisco", "guadalajara", "gdl"],
-            "estado de méxico": ["edomex", "estado de mexico", "toluca"],
-        }
-        terminos = abreviaturas.get(estado_lower, [estado_lower, estado_lower[:4]])
-        terminos_plain = [strip_accents(t) for t in terminos]
+        municipios = get_municipios_por_estado(estado)
+        terminos = [estado] + municipios
+        terminos_plain = [strip_accents(t.lower()) for t in terminos]
         if any(t in job_location_plain for t in terminos_plain):
             print(f"  MATCH por estado: {estado}")
             return True
