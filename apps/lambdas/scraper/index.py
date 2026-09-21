@@ -273,28 +273,52 @@ def scrape_occ(terms: list[str]) -> list[dict]:
         r = safe_get(url)
         if not r:
             continue
-        soup  = BeautifulSoup(r.text, "html.parser")
-        cards = (soup.find_all("article") or
-                 soup.find_all(attrs={"data-testid": "job-card"}) or
-                 soup.find_all(class_=lambda c: c and "job-card" in c.lower() if c else False))
-        for card in cards:
-            try:
-                title_el   = card.find(["h2", "h3"]) or card.find("a")
-                company_el = (card.find(attrs={"data-testid": "company-name"}) or
-                              card.find(class_=lambda c: c and "company" in c.lower() if c else False))
-                link_el    = card.find("a", href=True)
-                loc_el     = (card.find(attrs={"data-testid": "job-location"}) or
-                              card.find(class_=lambda c: c and "location" in c.lower() if c else False))
-                title    = title_el.get_text(strip=True)   if title_el   else ""
-                company  = company_el.get_text(strip=True) if company_el else "N/A"
-                href     = link_el["href"] if link_el else ""
-                link     = ("https://www.occ.com.mx" + href) if href.startswith("/") else href or url
-                location = loc_el.get_text(strip=True) if loc_el else "México"
-                if title and is_relevant(title, location, keywords):
-                    jobs.append({"source": "OCC", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
-            except Exception as e:
-                print(f"  OCC card error: {e}")
+        try:
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            # El link visible en cada tarjeta apunta a la EMPRESA, no a la
+            # vacante — la liga real (con slug) solo viene en el JSON-LD
+            # de la página, así que hay que cruzarla por id con las
+            # tarjetas del DOM (data-id).
+            id_a_url = {}
+            ld = soup.find("script", type="application/ld+json")
+            if ld and ld.string:
+                data = json.loads(ld.string)
+                for node in data.get("@graph", []):
+                    if "itemListElement" in node:
+                        for it in node["itemListElement"]:
+                            m = re.search(r"/oferta/(\d+)-", it.get("url", ""))
+                            if m:
+                                id_a_url[m.group(1)] = it["url"].split("?")[0].replace("//empleo", "/empleo")
+                        break
+
+            cards = soup.find_all(attrs={"data-offers-grid-offer-item-container": True})
+            for card in cards:
+                try:
+                    oferta_id = card.get("data-id", "")
+                    title_el  = card.find("h2")
+                    title     = title_el.get_text(strip=True) if title_el else ""
+                    if not title:
+                        continue
+
+                    company_el = card.select_one(".line-clamp-title a")
+                    company    = company_el.get_text(strip=True) if company_el else "N/A"
+
+                    loc_el   = card.select_one(".no-alter-loc-text p")
+                    location = loc_el.get_text(strip=True) if loc_el else "México"
+
+                    # Sin match en el JSON-LD (tarjetas promocionadas que no
+                    # entran a esa lista): mejor un link con solo el id que
+                    # nada, aunque le falte el slug bonito.
+                    link = id_a_url.get(oferta_id, f"https://www.occ.com.mx/empleo/oferta/{oferta_id}")
+
+                    if is_relevant(title, location, keywords):
+                        jobs.append({"source": "OCC", "title": title, "company": company,
+                                     "location": location, "link": link, "job_id": job_id(title, company, location)})
+                except Exception as e:
+                    print(f"  OCC card error: {e}")
+        except Exception as e:
+            print(f"  OCC parse error [{term}]: {e}")
     print(f"OCC: {len(jobs)} vacantes encontradas")
     return jobs
 
@@ -377,26 +401,34 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
         slug = slugify(term)
         if not slug:
             continue
-        url = f"https://www.computrabajo.com.mx/empleos-de-{slug}"
+        # El dominio viejo (www.computrabajo.com.mx) ahora hace 301 a este.
+        url = f"https://mx.computrabajo.com/empleos-de-{slug}"
         r   = safe_get(url)
         if not r:
             continue
         soup  = BeautifulSoup(r.text, "html.parser")
-        cards = (soup.find_all("article", class_=lambda c: c and "box_offer" in c if c else False) or
-                 soup.find_all("div",     class_=lambda c: c and "offer" in c.lower() if c else False) or
-                 soup.find_all("li",      class_=lambda c: c and "offer" in c.lower() if c else False))
+        cards = soup.find_all("article", class_=lambda c: c and "box_offer" in c if c else False)
         for card in cards:
             try:
-                title_el   = card.find(["h2", "h3", "a"])
-                company_el = card.find(class_=lambda c: c and "company" in c.lower() if c else False)
-                link_el    = card.find("a", href=True)
-                loc_el     = card.find(class_=lambda c: c and ("location" in c.lower() or "city" in c.lower()) if c else False)
-                title    = title_el.get_text(strip=True)   if title_el   else ""
-                company  = company_el.get_text(strip=True) if company_el else "N/A"
-                href     = link_el["href"] if link_el else ""
-                link     = ("https://www.computrabajo.com.mx" + href) if href.startswith("/") else href or url
-                location = loc_el.get_text(strip=True) if loc_el else "México"
-                if title and is_relevant(title, location, keywords):
+                title_el = card.select_one("a.js-o-link")
+                title    = title_el.get_text(strip=True) if title_el else ""
+                if not title:
+                    continue
+
+                href = title_el.get("href", "")
+                link = href if href.startswith("http") else f"https://mx.computrabajo.com{href}"
+
+                # Compañía y ubicación son los dos primeros <p class="...
+                # fc_base..."> de la tarjeta, en ese orden fijo — no hay
+                # una clase que las distinga entre sí.
+                parrafos = card.select("p.fc_base")
+                company  = parrafos[0].get_text(" ", strip=True) if len(parrafos) > 0 else "N/A"
+                # Algunas tarjetas traen una calificación numérica pegada
+                # antes del nombre (ej. "3.9 Hermos S.A DE C.V.").
+                company  = re.sub(r"^\d+(\.\d+)?\s+", "", company).strip() or "N/A"
+                location = parrafos[1].get_text(" ", strip=True) if len(parrafos) > 1 else "México"
+
+                if is_relevant(title, location, keywords):
                     jobs.append({"source": "Computrabajo", "title": title, "company": company,
                                  "location": location, "link": link, "job_id": job_id(title, company, location)})
             except Exception as e:
@@ -601,6 +633,8 @@ def main(event=None, context=None):
     scrapers = [
         ("LinkedIn", lambda: scrape_linkedin(terms)),
         ("Freelancer", lambda: scrape_freelancer(terms)),
+        ("OCC", lambda: scrape_occ(terms)),
+        ("Computrabajo", lambda: scrape_computrabajo(terms)),
     ]
 
     all_jobs = []
