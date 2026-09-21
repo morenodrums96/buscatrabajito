@@ -23,7 +23,13 @@ const SOURCE_COLORS: Record<string, string> = {
   Remotive: "bg-green-100 text-green-700",
   WeWorkRemotely: "bg-teal-100 text-teal-700",
   Himalayas: "bg-indigo-100 text-indigo-700",
+  Freelancer: "bg-amber-100 text-amber-700",
 };
+
+// Freelancer.com es un marketplace sin fronteras — casi ninguna vacante
+// especifica país, así que el filtro de estados de México no aplica.
+// Se marca para que quede claro por qué aparece aunque no diga México.
+const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
 
 function timeAgo(timestamp: number): string {
   const diff = Date.now() / 1000 - timestamp;
@@ -140,6 +146,14 @@ export default function VacantesPage() {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SOURCE_COLORS[vacante.source] ?? "bg-slate-100 text-slate-600"}`}>
                   {vacante.source}
                 </span>
+                {FUENTES_INTERNACIONALES.has(vacante.source) && (
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500"
+                    title="Marketplace sin fronteras — no filtra por estado de México"
+                  >
+                    Internacional
+                  </span>
+                )}
                 <span className="text-[11px] text-slate-400">
                   {vacante.posted_date ? (
                     <>{textoPublicacion(vacante.posted_date)} · {formatFechaPublicacion(vacante.posted_date)}</>
