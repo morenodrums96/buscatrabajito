@@ -35,13 +35,19 @@ from bs4 import BeautifulSoup
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "job-bot-seen-jobs")
 USERS_TABLE    = os.environ.get("USERS_TABLE", "buscatrabajito-users")
 EXPIRY_DAYS    = 14
-MAX_TERMS      = 20  # cada perfil ahora aporta varios términos normalizados (antes 1 c/u)
+MAX_TERMS      = 20
 
-# Servicio de scraping (ScraperAPI, ZenRows, etc.) para evitar bloqueos de
-# LinkedIn — opcional: si no hay API key configurada, cae de regreso a la
-# petición directa (safe_get) que ya se usaba antes.
 SCRAPER_SERVICE_API_KEY = os.environ.get("SCRAPER_SERVICE_API_KEY", "")
 SCRAPER_SERVICE_URL     = os.environ.get("SCRAPER_SERVICE_URL", "https://api.scraperapi.com")
+
+# Locations de LinkedIn — busca primero en NL específico, luego en México
+# general para capturar remotas. El matching filtra por estado del usuario.
+LINKEDIN_LOCATIONS = [
+    "Monterrey, Nuevo León, Mexico",
+    "San Pedro Garza García, Nuevo León, Mexico",
+    "Guadalupe, Nuevo León, Mexico",
+    "Mexico",  # captura remotas y otras ciudades
+]
 
 HEADERS_POOL = [
     {
@@ -62,9 +68,8 @@ HEADERS_POOL = [
 ]
 
 
-# ── Términos de búsqueda (derivados de los perfiles guardados) ──────
+# ── Términos de búsqueda ──────────────────────────────────────────
 def normalize_puesto(puesto: str) -> str:
-    """'Engineering Lead / Backend (Node.js) - Proyecto freelance' -> 'Engineering Lead'."""
     primero = re.split(r"[/(\-–]", puesto)[0].strip()
     return primero
 
@@ -78,11 +83,6 @@ def slugify(text: str) -> str:
 
 
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
-    """Términos de búsqueda de cada perfil guardado. Usa terminos_busqueda
-    (normalizado por IA en inglés/español al guardar el perfil, ver
-    apps/web/app/api/cv/guardar) cuando existe; si un perfil todavía no
-    lo tiene (guardado antes de este cambio), cae de regreso al puesto
-    original recortado."""
     dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     table = dynamodb.Table(USERS_TABLE)
     profiles = []
@@ -126,10 +126,9 @@ def get_dynamodb_table():
 
 
 def load_seen() -> set:
-    """Carga IDs vistos en los últimos 14 días desde DynamoDB."""
-    table    = get_dynamodb_table()
-    cutoff   = int((datetime.now(timezone.utc) - timedelta(days=EXPIRY_DAYS)).timestamp())
-    seen     = set()
+    table  = get_dynamodb_table()
+    cutoff = int((datetime.now(timezone.utc) - timedelta(days=EXPIRY_DAYS)).timestamp())
+    seen   = set()
     try:
         response = table.scan(
             FilterExpression="seen_at > :cutoff",
@@ -152,11 +151,10 @@ def load_seen() -> set:
 
 
 def save_seen_batch(job_ids: list):
-    """Guarda IDs nuevos en DynamoDB con timestamp actual."""
     if not job_ids:
         return
-    table    = get_dynamodb_table()
-    now_ts   = int(datetime.now(timezone.utc).timestamp())
+    table  = get_dynamodb_table()
+    now_ts = int(datetime.now(timezone.utc).timestamp())
     try:
         with table.batch_writer() as batch:
             for jid in job_ids:
@@ -167,12 +165,11 @@ def save_seen_batch(job_ids: list):
 
 
 def save_jobs_batch(jobs: list[dict]):
-    """Guarda vacantes completas en buscatrabajito-jobs para referencia."""
     if not jobs:
         return
     dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
-    table = dynamodb.Table("buscatrabajito-jobs")
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    table    = dynamodb.Table("buscatrabajito-jobs")
+    now_ts   = int(datetime.now(timezone.utc).timestamp())
     try:
         with table.batch_writer() as batch:
             for j in jobs:
@@ -191,15 +188,13 @@ def save_jobs_batch(jobs: list[dict]):
 
 
 def trigger_matching(new_jobs: list[dict]):
-    """Invoca la Lambda de matching con las vacantes nuevas — ésta decide,
-    por usuario, si son relevantes y le manda el correo (SES) si aplica."""
     if not new_jobs:
         return
     lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     try:
         lambda_client.invoke(
             FunctionName="buscatrabajito-matching",
-            InvocationType="Event",  # async — no bloquea
+            InvocationType="Event",
             Payload=json.dumps({"jobs": new_jobs}).encode(),
         )
         print(f"[matching] invocado con {len(new_jobs)} vacantes")
@@ -209,11 +204,6 @@ def trigger_matching(new_jobs: list[dict]):
 
 # ── Helpers ───────────────────────────────────────────────────────
 def job_id(title: str, company: str, location: str = "") -> str:
-    # Incluye la ubicación: empresas que republican el mismo puesto en
-    # varias ciudades (común en roles remotos) generan vacantes con el
-    # mismo título+empresa pero relevantes para usuarios distintos según
-    # su estado — sin esto, la segunda ciudad se descartaba como
-    # "ya vista" en cuanto se procesaba la primera.
     clave = f"{title.lower().strip()}{company.lower().strip()}{location.lower().strip()}"
     return hashlib.md5(clave.encode()).hexdigest()
 
@@ -223,11 +213,6 @@ def random_headers() -> dict:
 
 
 def keywords_from_terms(terms: list[str]) -> list[str]:
-    """Palabras sueltas (>3 letras) de cada término, en vez de exigir la
-    frase completa ("engineering lead") como substring del título — eso
-    descartaba de entrada vacantes como "Lead Backend Engineer" que sí
-    son relevantes. La relevancia fina la vuelve a filtrar matching.py
-    por usuario con la misma lógica de palabra por palabra."""
     words = set()
     for term in terms:
         for word in term.lower().split():
@@ -237,9 +222,6 @@ def keywords_from_terms(terms: list[str]) -> list[str]:
 
 
 def is_relevant(title: str, location: str, keywords: list[str]) -> bool:
-    """Filtro amplio: solo exige coincidencia de palabra clave y una
-    ubicación no vacía. La relevancia fina (estado, modalidad,
-    disponibilidad) la decide buscatrabajito-matching por usuario."""
     title_l = title.lower()
     if not any(k in title_l for k in keywords):
         return False
@@ -250,7 +232,6 @@ def is_relevant(title: str, location: str, keywords: list[str]) -> bool:
 
 
 def is_relevant_remote(title: str, keywords: list[str]) -> bool:
-    """Para fuentes 100% remotas — solo valida la palabra clave."""
     title_l = title.lower()
     return any(k in title_l for k in keywords)
 
@@ -281,7 +262,7 @@ def scrape_occ(terms: list[str]) -> list[dict]:
         r = safe_get(url)
         if not r:
             continue
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup  = BeautifulSoup(r.text, "html.parser")
         cards = (soup.find_all("article") or
                  soup.find_all(attrs={"data-testid": "job-card"}) or
                  soup.find_all(class_=lambda c: c and "job-card" in c.lower() if c else False))
@@ -308,93 +289,84 @@ def scrape_occ(terms: list[str]) -> list[dict]:
 
 
 def scrape_linkedin(terms: list[str]) -> list[dict]:
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
-    # LinkedIn pagina de a 25 resultados (parámetro start=0,25,50,...).
-    # Con la ventana de 14 días puede haber más de una página por
-    # término, así que las recorremos hasta que una venga vacía o hasta
-    # este tope, para no disparar el tiempo de corrida (ni el gasto, si
-    # se está usando un servicio de scraping de pago).
     MAX_PAGES = 3
+
     for term in terms:
-        for page in range(MAX_PAGES):
-            start = page * 25
-            target_url = (
-                "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-                f"?keywords={requests.utils.quote(term)}"
-                f"&location={requests.utils.quote('Mexico')}"
-                # f_TPR=r1800 (últimos 30 min) dejaba fuera cualquier vacante
-                # publicada antes de la corrida anterior — con r1209600 (14
-                # días) coincide con la ventana de deduplicación de
-                # job-bot-seen-jobs, así que no perdemos vacantes reales por
-                # esto y el dedupe por job_id sigue evitando avisos repetidos.
-                f"&f_TPR=r1209600&start={start}"
-            )
+        for location_query in LINKEDIN_LOCATIONS:
+            for page in range(MAX_PAGES):
+                start      = page * 25
+                target_url = (
+                    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+                    f"?keywords={requests.utils.quote(term)}"
+                    f"&location={requests.utils.quote(location_query)}"
+                    f"&f_TPR=r1209600&start={start}"
+                )
 
-            # Con API key configurada, la petición pasa por el servicio de
-            # scraping (IP residencial rotativa) para reducir bloqueos de
-            # LinkedIn; sin key, cae de regreso a la petición directa.
-            if SCRAPER_SERVICE_API_KEY:
-                payload = {
-                    "api_key": SCRAPER_SERVICE_API_KEY,
-                    "url": target_url,
-                    "country_code": "mx",
-                    "premium": "true",
-                }
-                try:
-                    r = requests.get(SCRAPER_SERVICE_URL, params=payload, timeout=25)
-                except Exception as e:
-                    print(f"  Error llamando al servicio de scraping [{term}]: {e}")
+                if SCRAPER_SERVICE_API_KEY:
+                    payload = {
+                        "api_key":     SCRAPER_SERVICE_API_KEY,
+                        "url":         target_url,
+                        "country_code": "mx",
+                        "premium":     "true",
+                    }
+                    try:
+                        r = requests.get(SCRAPER_SERVICE_URL, params=payload, timeout=25)
+                    except Exception as e:
+                        print(f"  Error scraping service [{term}|{location_query}]: {e}")
+                        break
+                else:
+                    r = safe_get(target_url)
+
+                if not r or r.status_code != 200:
+                    print(f"  LinkedIn: sin resultados [{term}|{location_query}] pág {page}")
                     break
-            else:
-                r = safe_get(target_url)
 
-            if not r or r.status_code != 200:
-                print(f"  LinkedIn: sin resultados para [{term}] en página {page}")
-                break
+                soup  = BeautifulSoup(r.text, "html.parser")
+                cards = soup.find_all("li")
+                if not cards:
+                    break
 
-            soup = BeautifulSoup(r.text, "html.parser")
-            cards = soup.find_all("li")
-            if not cards:
-                break  # ya no hay más resultados para este término
+                for card in cards:
+                    try:
+                        title_el   = card.find("h3")
+                        company_el = card.find("h4")
+                        link_el    = card.find("a", href=True)
+                        loc_el     = card.find(class_="job-search-card__location")
+                        title    = title_el.get_text(strip=True)   if title_el   else ""
+                        company  = company_el.get_text(strip=True) if company_el else "N/A"
+                        link     = link_el["href"].split("?")[0]   if link_el    else ""
+                        location = loc_el.get_text(strip=True)     if loc_el     else location_query
+                        if title and is_relevant(title, location, keywords):
+                            jobs.append({"source": "LinkedIn", "title": title, "company": company,
+                                         "location": location, "link": link,
+                                         "job_id": job_id(title, company, location)})
+                    except Exception as e:
+                        print(f"  LinkedIn card error: {e}")
 
-            for card in cards:
-                try:
-                    title_el   = card.find("h3")
-                    company_el = card.find("h4")
-                    link_el    = card.find("a", href=True)
-                    loc_el     = card.find(class_="job-search-card__location")
-                    title    = title_el.get_text(strip=True)   if title_el   else ""
-                    company  = company_el.get_text(strip=True) if company_el else "N/A"
-                    link     = link_el["href"].split("?")[0]   if link_el    else ""
-                    location = loc_el.get_text(strip=True)     if loc_el     else "México"
-                    if title and is_relevant(title, location, keywords):
-                        jobs.append({"source": "LinkedIn", "title": title, "company": company,
-                                     "location": location, "link": link, "job_id": job_id(title, company, location)})
-                except Exception as e:
-                    print(f"  LinkedIn card error: {e}")
+                if len(cards) < 25:
+                    break  # última página
 
-            if len(cards) < 25:
-                break  # última página parcial
     print(f"LinkedIn: {len(jobs)} vacantes encontradas")
     return jobs
 
 
 def scrape_computrabajo(terms: list[str]) -> list[dict]:
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
     for term in terms:
         slug = slugify(term)
         if not slug:
             continue
         url = f"https://www.computrabajo.com.mx/empleos-de-{slug}"
-        r = safe_get(url)
+        r   = safe_get(url)
         if not r:
             continue
         soup  = BeautifulSoup(r.text, "html.parser")
         cards = (soup.find_all("article", class_=lambda c: c and "box_offer" in c if c else False) or
-                 soup.find_all("div", class_=lambda c: c and "offer" in c.lower() if c else False) or
-                 soup.find_all("li", class_=lambda c: c and "offer" in c.lower() if c else False))
+                 soup.find_all("div",     class_=lambda c: c and "offer" in c.lower() if c else False) or
+                 soup.find_all("li",      class_=lambda c: c and "offer" in c.lower() if c else False))
         for card in cards:
             try:
                 title_el   = card.find(["h2", "h3", "a"])
@@ -416,19 +388,19 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
 
 
 def scrape_bumeran(terms: list[str]) -> list[dict]:
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
     for term in terms:
         slug = slugify(term)
         if not slug:
             continue
         url = f"https://www.bumeran.com.mx/empleos-busqueda-{slug}.html?reciente=true"
-        r = safe_get(url)
+        r   = safe_get(url)
         if not r:
             continue
         soup  = BeautifulSoup(r.text, "html.parser")
         cards = (soup.find_all("div", class_=lambda c: c and "Posting" in c if c else False) or
-                 soup.find_all("li", class_=lambda c: c and "posting" in c.lower() if c else False) or
+                 soup.find_all("li",  class_=lambda c: c and "posting" in c.lower() if c else False) or
                  soup.find_all("article"))
         for card in cards:
             try:
@@ -451,8 +423,7 @@ def scrape_bumeran(terms: list[str]) -> list[dict]:
 
 
 def scrape_remotive(terms: list[str]) -> list[dict]:
-    """Remotive API JSON pública — no bloquea."""
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
     for term in terms:
         url = f"https://remotive.com/api/remote-jobs?search={requests.utils.quote(term)}&limit=50"
@@ -469,7 +440,8 @@ def scrape_remotive(terms: list[str]) -> list[dict]:
                 link    = job.get("url", "")
                 if title and is_relevant_remote(title, keywords):
                     jobs.append({"source": "Remotive", "title": title, "company": company,
-                                 "location": "Remoto", "link": link, "job_id": job_id(title, company, "Remoto")})
+                                 "location": "Remoto", "link": link,
+                                 "job_id": job_id(title, company, "Remoto")})
         except Exception as e:
             print(f"  Remotive error [{term}]: {e}")
     print(f"Remotive: {len(jobs)} vacantes encontradas")
@@ -477,8 +449,7 @@ def scrape_remotive(terms: list[str]) -> list[dict]:
 
 
 def scrape_weworkremotely(terms: list[str]) -> list[dict]:
-    """WeWorkRemotely RSS feed — no bloquea."""
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
     rss_feeds = [
         "https://weworkremotely.com/categories/remote-data-science-jobs.rss",
@@ -495,13 +466,14 @@ def scrape_weworkremotely(terms: list[str]) -> list[dict]:
                 continue
             root = ET.fromstring(r.content)
             for item in root.findall(".//item"):
-                title   = item.findtext("title", "").strip()
+                title       = item.findtext("title", "").strip()
                 company_raw = title.split(" at ")[-1] if " at " in title else "N/A"
                 title_clean = title.split(" at ")[0].strip() if " at " in title else title
-                link    = item.findtext("link", "").strip()
+                link        = item.findtext("link", "").strip()
                 if title_clean and is_relevant_remote(title_clean, keywords):
-                    jobs.append({"source": "WeWorkRemotely", "title": title_clean, "company": company_raw,
-                                 "location": "Remoto", "link": link, "job_id": job_id(title_clean, company_raw, "Remoto")})
+                    jobs.append({"source": "WeWorkRemotely", "title": title_clean,
+                                 "company": company_raw, "location": "Remoto",
+                                 "link": link, "job_id": job_id(title_clean, company_raw, "Remoto")})
         except Exception as e:
             print(f"  WWR RSS error: {e}")
     print(f"WeWorkRemotely: {len(jobs)} vacantes encontradas")
@@ -509,8 +481,7 @@ def scrape_weworkremotely(terms: list[str]) -> list[dict]:
 
 
 def scrape_himalayas(terms: list[str]) -> list[dict]:
-    """Himalayas API JSON pública — no bloquea."""
-    jobs = []
+    jobs     = []
     keywords = keywords_from_terms(terms)
     for term in terms:
         url = f"https://himalayas.app/api/jobs?q={requests.utils.quote(term)}&limit=50"
@@ -520,7 +491,7 @@ def scrape_himalayas(terms: list[str]) -> list[dict]:
             if r.status_code != 200:
                 print(f"  Himalayas API {r.status_code}: {term}")
                 continue
-            data = r.json()
+            data  = r.json()
             items = data.get("jobs", data.get("data", []))
             for job in items:
                 title    = job.get("title", "")
@@ -529,7 +500,8 @@ def scrape_himalayas(terms: list[str]) -> list[dict]:
                 location = job.get("location", "Remoto / México")
                 if title and is_relevant_remote(title, keywords):
                     jobs.append({"source": "Himalayas", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
+                                 "location": location, "link": link,
+                                 "job_id": job_id(title, company, location)})
         except Exception as e:
             print(f"  Himalayas error [{term}]: {e}")
     print(f"Himalayas: {len(jobs)} vacantes encontradas")
@@ -538,7 +510,7 @@ def scrape_himalayas(terms: list[str]) -> list[dict]:
 
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
-    new_jobs = []
+    new_jobs        = []
     seen_this_batch = set()
     for j in jobs:
         if j["job_id"] not in seen and j["job_id"] not in seen_this_batch:
@@ -559,10 +531,6 @@ def main(event=None, context=None):
 
     seen = load_seen()
 
-    # Por ahora solo LinkedIn — OCC, Himalayas y Bumeran están rotos (el
-    # sitio/API les cambió) y Computrabajo/Remotive/WeWorkRemotely se
-    # desactivaron a petición mientras se revisan las demás. Las
-    # funciones siguen abajo, listas para reactivarse cuando se necesite.
     scrapers = [
         ("LinkedIn", lambda: scrape_linkedin(terms)),
     ]
