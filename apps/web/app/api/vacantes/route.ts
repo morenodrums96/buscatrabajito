@@ -75,5 +75,5 @@ export async function GET() {
     .filter((job) => sinPreferencias || coincideConPreferencias(job, estadosDeseados, modalidadDeseada))
     .sort((a, b) => (b.seen_at ?? 0) - (a.seen_at ?? 0));
 
-  return NextResponse.json(items.slice(0, 50));
+  return NextResponse.json(items);
 }
