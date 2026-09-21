@@ -292,7 +292,9 @@ def scrape_occ(terms: list[str]) -> list[dict]:
 def scrape_linkedin(terms: list[str]) -> list[dict]:
     jobs     = []
     keywords = keywords_from_terms(terms)
-    MAX_PAGES = 3
+    MAX_PAGES = 6  # antes 3 — LinkedIn sin sesión no deja ordenar por fecha,
+    # así que hay que muestrear más profundo en resultados por "relevancia"
+    # para pescar vacantes nuevas que no rankean en las primeras páginas.
 
     for term in terms:
         for location_query in LINKEDIN_LOCATIONS:
