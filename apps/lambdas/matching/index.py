@@ -68,13 +68,21 @@ def get_user_data(user_id: str) -> dict:
 
 def job_matches_profile(job: dict, profile: dict) -> bool:
     puesto = profile.get("puesto", "").lower()
+    terminos_busqueda = profile.get("terminos_busqueda") or []
     job_title = job.get("title", "").lower()
     job_location = job.get("location", "").lower()
 
-    puesto_words = [w for w in puesto.split() if len(w) > 3]
+    # puesto es el título tal cual lo escribió el usuario (a veces en
+    # español), pero terminos_busqueda son las variantes normalizadas por
+    # IA (usualmente en inglés) que el scraper ya usa para buscar en
+    # LinkedIn — sin incluirlas aquí, un puesto en español nunca hace
+    # match contra títulos en inglés aunque el scraper sí haya
+    # encontrado la vacante correcta con esos mismos términos.
+    frases = [puesto] + [t.lower() for t in terminos_busqueda]
+    puesto_words = {w for frase in frases for w in frase.split() if len(w) > 3}
     title_match = any(word in job_title for word in puesto_words)
-    
-    print(f"  puesto={puesto} | title={job_title} | words={puesto_words} | title_match={title_match}")
+
+    print(f"  puesto={puesto} | terminos_busqueda={terminos_busqueda} | title={job_title} | words={puesto_words} | title_match={title_match}")
     
     if not title_match:
         return False
