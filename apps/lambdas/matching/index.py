@@ -135,7 +135,9 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     idiomas_deseados = profile.get("idiomasVacantes") or []
     if idiomas_deseados:
         codigos_deseados = {IDIOMA_CODIGOS[i] for i in idiomas_deseados if i in IDIOMA_CODIGOS}
-        idioma_job = detectar_idioma(job.get("title", ""))
+        # Algunas fuentes (ej. Freelancer.com) reportan el idioma real de
+        # la vacante — más confiable que adivinar por palabras clave.
+        idioma_job = job.get("idioma") or detectar_idioma(job.get("title", ""))
         if codigos_deseados and idioma_job not in codigos_deseados:
             print(f"  NO MATCH (idioma detectado={idioma_job}, deseado={idiomas_deseados})")
             return False
@@ -144,7 +146,9 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     # Prácticas). Mismo criterio: sin selección, no filtra.
     tipos_deseados = profile.get("tiposTrabajo") or []
     if tipos_deseados:
-        tipo_job = detectar_tipo_empleo(job.get("title", ""))
+        # Freelancer.com es 100% trabajo freelance por definición — no
+        # depende de que el título lo diga explícitamente.
+        tipo_job = "Freelance / Proyecto" if job.get("source") == "Freelancer" else detectar_tipo_empleo(job.get("title", ""))
         if tipo_job not in tipos_deseados:
             print(f"  NO MATCH (tipo de empleo detectado={tipo_job}, deseado={tipos_deseados})")
             return False
@@ -241,6 +245,7 @@ def save_match(user_id: str, job: dict):
         "link": job["link"],
         "source": job["source"],
         "posted_date": job.get("posted_date", ""),
+        "idioma": job.get("idioma", ""),
         "seen_at": now,
         "notified": False,
     })

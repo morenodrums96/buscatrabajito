@@ -81,14 +81,19 @@ function coincideConPreferencias(
     const codigosDeseados = idiomasDeseados
       .map((i) => IDIOMA_CODIGOS[i])
       .filter((c): c is string => Boolean(c));
-    const idiomaJob = detectarIdioma(String(job.title ?? ""));
+    // Algunas fuentes (ej. Freelancer.com) guardan el idioma real de la
+    // vacante — más confiable que adivinar por palabras clave.
+    const idiomaGuardado = String(job.idioma ?? "");
+    const idiomaJob = idiomaGuardado || detectarIdioma(String(job.title ?? ""));
     if (codigosDeseados.length > 0 && !codigosDeseados.includes(idiomaJob)) {
       return false;
     }
   }
 
   if (tiposTrabajoDeseados.length > 0) {
-    const tipoJob = detectarTipoEmpleo(String(job.title ?? ""));
+    // Freelancer.com es 100% trabajo freelance por definición.
+    const tipoJob =
+      job.source === "Freelancer" ? "Freelance / Proyecto" : detectarTipoEmpleo(String(job.title ?? ""));
     if (!tiposTrabajoDeseados.includes(tipoJob)) {
       return false;
     }

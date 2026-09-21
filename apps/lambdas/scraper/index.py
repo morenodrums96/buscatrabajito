@@ -181,6 +181,7 @@ def save_jobs_batch(jobs: list[dict]):
                     "link":        j["link"],
                     "source":      j["source"],
                     "posted_date": j.get("posted_date", ""),
+                    "idioma":      j.get("idioma", ""),
                     "seen_at":     now_ts,
                 })
         print(f"[buscatrabajito-jobs] {len(jobs)} vacantes guardadas")
@@ -465,6 +466,55 @@ def scrape_remotive(terms: list[str]) -> list[dict]:
     return jobs
 
 
+def scrape_freelancer(terms: list[str]) -> list[dict]:
+    jobs     = []
+    keywords = keywords_from_terms(terms)
+    for term in terms:
+        url = (
+            "https://www.freelancer.com/api/projects/0.1/projects/active/"
+            f"?query={requests.utils.quote(term)}&limit=30"
+        )
+        try:
+            time.sleep(random.uniform(1.0, 2.0))
+            r = requests.get(url, headers=random_headers(), timeout=15)
+            if r.status_code != 200:
+                print(f"  Freelancer API {r.status_code}: {term}")
+                continue
+            data = r.json()
+            for p in data.get("result", {}).get("projects", []):
+                title      = p.get("title", "")
+                seo_url    = p.get("seo_url", "")
+                link       = f"https://www.freelancer.com/projects/{seo_url}" if seo_url else ""
+                submitdate = p.get("submitdate")
+                posted_date = (
+                    datetime.fromtimestamp(submitdate, tz=timezone.utc).strftime("%Y-%m-%d")
+                    if submitdate else ""
+                )
+                if title and is_relevant_remote(title, keywords):
+                    jobs.append({
+                        "source": "Freelancer", "title": title, "company": "Freelancer.com",
+                        # Trabajo 100% remoto por naturaleza — "Remoto" en location
+                        # reutiliza el chequeo de modalidad Remoto que ya existe en
+                        # job_matches_profile, sin necesitar un caso especial.
+                        "location": "Remoto", "link": link,
+                        # El id numérico del proyecto (único) en vez de
+                        # title+company+location: muchos títulos de Freelancer.com
+                        # son genéricos ("Website designing") y "company" siempre
+                        # es el mismo placeholder, así que hashear solo esos campos
+                        # colisionaría entre proyectos distintos.
+                        "job_id": job_id(title, "Freelancer.com", str(p.get("id", ""))),
+                        "posted_date": posted_date,
+                        # Idioma real que reporta la API — más confiable que la
+                        # heurística por palabras clave que usa matching.py para
+                        # las demás fuentes.
+                        "idioma": p.get("language", ""),
+                    })
+        except Exception as e:
+            print(f"  Freelancer error [{term}]: {e}")
+    print(f"Freelancer: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 def scrape_weworkremotely(terms: list[str]) -> list[dict]:
     jobs     = []
     keywords = keywords_from_terms(terms)
@@ -550,6 +600,7 @@ def main(event=None, context=None):
 
     scrapers = [
         ("LinkedIn", lambda: scrape_linkedin(terms)),
+        ("Freelancer", lambda: scrape_freelancer(terms)),
     ]
 
     all_jobs = []
