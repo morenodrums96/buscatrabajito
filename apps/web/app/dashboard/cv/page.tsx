@@ -768,8 +768,10 @@ export default function CVPage() {
     });
   }
 
-  // El freelance se acuerda directamente con cada empresa, así que no
-  // tiene sentido combinarlo con una modalidad fija (remoto/híbrido/presencial).
+  // Freelance / Proyecto SÍ puede combinarse con modalidad: fuentes como
+  // Freelancer.com son 100% remotas, así que necesitamos que el usuario
+  // pueda tener "Remoto" marcado junto con "Freelance / Proyecto" para
+  // que esas vacantes le aparezcan.
   function toggleTipoTrabajo(t: string) {
     setCvData(d => {
       if (!d) return d;
@@ -782,10 +784,6 @@ export default function CVPage() {
         tipoJornada: seActiva
           ? [...actuales, t]
           : actuales.filter(x => x !== t),
-        modalidadDeseada:
-          seActiva && t === "Freelance / Proyecto"
-            ? []
-            : d.modalidadDeseada,
       };
     });
   }
@@ -2007,13 +2005,6 @@ export default function CVPage() {
 
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Modalidad de Trabajo
-                      {(cvData.tipoJornada ?? []).includes(
-                        "Freelance / Proyecto"
-                      ) && (
-                        <span className="ml-2 font-medium text-slate-400 normal-case">
-                          — no aplica para Freelance / Proyecto
-                        </span>
-                      )}
                     </h3>
 
                     <div className="flex flex-wrap gap-2">
@@ -2023,9 +2014,6 @@ export default function CVPage() {
 
                           <button
                             key={m}
-                            disabled={(cvData.tipoJornada ?? []).includes(
-                              "Freelance / Proyecto"
-                            )}
                             onClick={() =>
                               toggleModalidad(m)
                             }

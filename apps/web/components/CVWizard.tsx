@@ -874,23 +874,17 @@ export default function AIProfileBuilder({
     updateData("estadosDeseados", todosSeleccionados ? [] : [...nombresEstados]);
   }
 
-  // El freelance se acuerda directamente con cada empresa, así que no tiene
-  // sentido combinarlo con una modalidad fija (remoto/híbrido/presencial).
+  // Freelance / Proyecto SÍ puede combinarse con modalidad: fuentes como
+  // Freelancer.com son 100% remotas, así que necesitamos que el usuario
+  // pueda tener "Remoto" marcado junto con "Freelance / Proyecto" para
+  // que esas vacantes le aparezcan.
   function toggleTipoJornada(tipo: string) {
     const actuales = data.tipoJornada ?? [];
-    const seActiva = !actuales.includes(tipo);
-    const nuevos = seActiva
-      ? [...actuales, tipo]
-      : actuales.filter((x) => x !== tipo);
+    const nuevos = actuales.includes(tipo)
+      ? actuales.filter((x) => x !== tipo)
+      : [...actuales, tipo];
 
-    setData((current) => ({
-      ...current,
-      tipoJornada: nuevos,
-      modalidadDeseada:
-        seActiva && tipo === "Freelance / Proyecto"
-          ? []
-          : current.modalidadDeseada,
-    }));
+    updateData("tipoJornada", nuevos);
   }
 
   function formatMiles(raw: string) {
@@ -1841,10 +1835,6 @@ export default function AIProfileBuilder({
       ----------------------------------------------------- */
 
       case 8: {
-        const esFreelance = (data.tipoJornada ?? []).includes(
-          "Freelance / Proyecto"
-        );
-
         return (
           <QuestionLayout
             eyebrow="Preferencias laborales"
@@ -2024,22 +2014,16 @@ export default function AIProfileBuilder({
               <div className="space-y-2.5">
                 <p className="text-xs font-bold text-slate-500">
                   Modalidad
-                  {esFreelance && (
-                    <span className="ml-2 font-medium text-slate-400 normal-case">
-                      — no aplica para Freelance / Proyecto
-                    </span>
-                  )}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {MODALIDADES_TRABAJO.map((modalidad) => (
                     <button
                       key={modalidad}
                       type="button"
-                      disabled={esFreelance}
                       onClick={() =>
                         toggleEnLista("modalidadDeseada", modalidad)
                       }
-                      className={`min-h-[40px] px-4 rounded-[10px] text-xs font-bold border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      className={`min-h-[40px] px-4 rounded-[10px] text-xs font-bold border transition-all ${
                         data.modalidadDeseada?.includes(modalidad)
                           ? "border-[#2563eb] bg-[#eff6ff] text-[#1e3a5f]"
                           : "border-[#e2e8f0] bg-white text-slate-500 hover:border-[#93c5fd]"
