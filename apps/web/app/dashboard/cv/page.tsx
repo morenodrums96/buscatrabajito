@@ -189,8 +189,34 @@ export default function CVPage() {
   const [aceptaNivelInferior, setAceptaNivelInferior] =
     useState(false);
 
+  // Catálogo real de estados/municipios (buscatrabajito-catalogs), para
+  // que los estados y ciudades de esta pantalla sean los mismos que usa
+  // buscatrabajito-matching al buscar vacantes. Si falla la carga, se
+  // cae a la lista corta de respaldo (ESTADOS).
+  const [catalogoEstados, setCatalogoEstados] =
+    useState<{ nombre: string; municipios: string[] }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/catalogs/estados")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (Array.isArray(d) && d.length > 0) setCatalogoEstados(d);
+      })
+      .catch(() => {});
+  }, []);
+
+  const nombresEstados =
+    catalogoEstados.length > 0
+      ? catalogoEstados.map(e => e.nombre)
+      : ESTADOS;
+
+  const municipiosPorEstado: Record<string, string[]> =
+    catalogoEstados.length > 0
+      ? Object.fromEntries(catalogoEstados.map(e => [e.nombre, e.municipios]))
+      : {};
+
   const todoMexico =
-    (cvData?.estadosDeseados?.length ?? 0) === ESTADOS.length;
+    (cvData?.estadosDeseados?.length ?? 0) === nombresEstados.length;
 
   // ============================================================
   // CARGAR DATOS
@@ -718,7 +744,7 @@ export default function CVPage() {
       d
         ? {
             ...d,
-            estadosDeseados: todoMexico ? [] : [...ESTADOS],
+            estadosDeseados: todoMexico ? [] : [...nombresEstados],
           }
         : d
     );
@@ -1120,9 +1146,38 @@ export default function CVPage() {
                             "
                           >
                             <option value="">Selecciona tu estado</option>
-                            {ESTADOS.map(estado => (
+                            {nombresEstados.map(estado => (
                               <option key={estado} value={estado}>
                                 {estado}
+                              </option>
+                            ))}
+                          </select>
+                        ) : f.field === "ciudad" && municipiosPorEstado[cvData.estado ?? ""]?.length ? (
+                          <select
+                            value={(cvData.ciudad as string) ?? ""}
+                            onChange={e =>
+                              updateField("ciudad", e.target.value)
+                            }
+                            className="
+                              w-full
+                              px-3
+                              py-2
+                              bg-slate-50/50
+                              border
+                              border-slate-200
+                              rounded-xl
+                              text-xs
+                              text-[#0F2744]
+                              focus:bg-white
+                              focus:border-[#2563EB]
+                              outline-none
+                              transition-all
+                            "
+                          >
+                            <option value="">Selecciona tu ciudad</option>
+                            {municipiosPorEstado[cvData.estado ?? ""].map(ciudad => (
+                              <option key={ciudad} value={ciudad}>
+                                {ciudad}
                               </option>
                             ))}
                           </select>
@@ -1889,7 +1944,7 @@ export default function CVPage() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                    {ESTADOS.map(
+                    {nombresEstados.map(
                       e => (
 
                         <button

@@ -682,6 +682,38 @@ export default function AIProfileBuilder({
       .catch(() => setCatalogoHabilidades(semilla));
   }, []);
 
+  // Catálogo real de estados/municipios (buscatrabajito-catalogs), para que
+  // los estados y ciudades que se muestran aquí sean los mismos que usa
+  // buscatrabajito-matching al buscar vacantes. Si falla la carga, se cae
+  // a las listas cortas de respaldo (ESTADOS_MEXICO / CIUDADES_POR_ESTADO).
+  const [catalogoEstados, setCatalogoEstados] = useState<
+    { nombre: string; municipios: string[] }[]
+  >([]);
+
+  useEffect(() => {
+    fetch("/api/catalogs/estados")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d) && d.length > 0) setCatalogoEstados(d);
+      })
+      .catch(() => {});
+  }, []);
+
+  const nombresEstados = useMemo(
+    () =>
+      catalogoEstados.length > 0
+        ? catalogoEstados.map((e) => e.nombre)
+        : ESTADOS_MEXICO,
+    [catalogoEstados]
+  );
+
+  const municipiosPorEstado = useMemo(() => {
+    if (catalogoEstados.length === 0) return CIUDADES_POR_ESTADO;
+    const mapa: Record<string, string[]> = {};
+    for (const e of catalogoEstados) mapa[e.nombre] = e.municipios;
+    return mapa;
+  }, [catalogoEstados]);
+
   const sugerenciasHabilidad = useMemo(() => {
     const texto = newSkill.trim().toLowerCase();
     if (!texto) return [];
@@ -833,9 +865,9 @@ export default function AIProfileBuilder({
 
   function toggleTodosLosEstados() {
     const todosSeleccionados =
-      (data.estadosDeseados ?? []).length === ESTADOS_MEXICO.length;
+      (data.estadosDeseados ?? []).length === nombresEstados.length;
 
-    updateData("estadosDeseados", todosSeleccionados ? [] : [...ESTADOS_MEXICO]);
+    updateData("estadosDeseados", todosSeleccionados ? [] : [...nombresEstados]);
   }
 
   // El freelance se acuerda directamente con cada empresa, así que no tiene
@@ -1826,7 +1858,7 @@ export default function AIProfileBuilder({
                     onChange={(e) => {
                       const nuevoEstado = e.target.value;
                       const ciudadesValidas =
-                        CIUDADES_POR_ESTADO[nuevoEstado] ?? [];
+                        municipiosPorEstado[nuevoEstado] ?? [];
 
                       setData((current) => ({
                         ...current,
@@ -1839,7 +1871,7 @@ export default function AIProfileBuilder({
                     className="w-full min-h-[48px] px-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-[14px] outline-none text-[#1e3a5f] text-sm transition-all focus:bg-white focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.08)]"
                   >
                     <option value="">Selecciona tu estado</option>
-                    {ESTADOS_MEXICO.map((estado) => (
+                    {nombresEstados.map((estado) => (
                       <option key={estado} value={estado}>
                         {estado}
                       </option>
@@ -1857,7 +1889,7 @@ export default function AIProfileBuilder({
                         ? "Selecciona tu ciudad"
                         : "Primero selecciona tu estado"}
                     </option>
-                    {(CIUDADES_POR_ESTADO[data.estado ?? ""] ?? []).map(
+                    {(municipiosPorEstado[data.estado ?? ""] ?? []).map(
                       (ciudad) => (
                         <option key={ciudad} value={ciudad}>
                           {ciudad}
@@ -1879,7 +1911,7 @@ export default function AIProfileBuilder({
                       type="checkbox"
                       checked={
                         (data.estadosDeseados?.length ?? 0) ===
-                        ESTADOS_MEXICO.length
+                        nombresEstados.length
                       }
                       onChange={toggleTodosLosEstados}
                       className="w-3.5 h-3.5 accent-[#2563eb]"
@@ -1889,7 +1921,7 @@ export default function AIProfileBuilder({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {ESTADOS_MEXICO.map((estado) => (
+                  {nombresEstados.map((estado) => (
                     <button
                       key={estado}
                       type="button"
