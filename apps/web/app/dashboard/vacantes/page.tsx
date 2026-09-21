@@ -12,6 +12,7 @@ interface Vacante {
   link: string;
   source: string;
   seen_at: number;
+  posted_date?: string; // fecha real de publicación (ISO, solo día) — LinkedIn no da hora
 }
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -40,6 +41,31 @@ function formatFechaHora(timestamp: number): string {
     minute: "2-digit",
     timeZone: "America/Mexico_City",
   });
+}
+
+// LinkedIn solo da la fecha de publicación con precisión de día, sin hora
+// (igual que muestran ellos mismos, ej. "hace 3 días").
+function diasDesdePublicacion(isoDate: string): number {
+  const fecha = new Date(`${isoDate}T00:00:00`);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fecha.setHours(0, 0, 0, 0);
+  return Math.round((hoy.getTime() - fecha.getTime()) / 86400000);
+}
+
+function formatFechaPublicacion(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function textoPublicacion(isoDate: string): string {
+  const dias = diasDesdePublicacion(isoDate);
+  if (dias <= 0) return "Publicada hoy";
+  if (dias === 1) return "Publicada hace 1 día";
+  return `Publicada hace ${dias} días`;
 }
 
 export default function VacantesPage() {
@@ -115,7 +141,11 @@ export default function VacantesPage() {
                   {vacante.source}
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  {timeAgo(vacante.seen_at)} · {formatFechaHora(vacante.seen_at)}
+                  {vacante.posted_date ? (
+                    <>{textoPublicacion(vacante.posted_date)} · {formatFechaPublicacion(vacante.posted_date)}</>
+                  ) : (
+                    <>Encontrada {timeAgo(vacante.seen_at)} · {formatFechaHora(vacante.seen_at)}</>
+                  )}
                 </span>
               </div>
 

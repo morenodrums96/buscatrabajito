@@ -174,13 +174,14 @@ def save_jobs_batch(jobs: list[dict]):
         with table.batch_writer() as batch:
             for j in jobs:
                 batch.put_item(Item={
-                    "job_id":   j["job_id"],
-                    "title":    j["title"],
-                    "company":  j["company"],
-                    "location": j["location"],
-                    "link":     j["link"],
-                    "source":   j["source"],
-                    "seen_at":  now_ts,
+                    "job_id":      j["job_id"],
+                    "title":       j["title"],
+                    "company":     j["company"],
+                    "location":    j["location"],
+                    "link":        j["link"],
+                    "source":      j["source"],
+                    "posted_date": j.get("posted_date", ""),
+                    "seen_at":     now_ts,
                 })
         print(f"[buscatrabajito-jobs] {len(jobs)} vacantes guardadas")
     except Exception as e:
@@ -334,13 +335,18 @@ def scrape_linkedin(terms: list[str]) -> list[dict]:
                         company_el = card.find("h4")
                         link_el    = card.find("a", href=True)
                         loc_el     = card.find(class_="job-search-card__location")
+                        # Fecha real de publicación (no cuándo la vimos nosotros).
+                        # LinkedIn solo da precisión de día, no de hora.
+                        time_el    = card.find("time", class_="job-search-card__listdate")
                         title    = title_el.get_text(strip=True)   if title_el   else ""
                         company  = company_el.get_text(strip=True) if company_el else "N/A"
                         link     = link_el["href"].split("?")[0]   if link_el    else ""
                         location = loc_el.get_text(strip=True)     if loc_el     else location_query
+                        posted_date = time_el.get("datetime") if time_el else ""
                         if title and is_relevant(title, location, keywords):
                             jobs.append({"source": "LinkedIn", "title": title, "company": company,
                                          "location": location, "link": link,
+                                         "posted_date": posted_date,
                                          "job_id": job_id(title, company, location)})
                     except Exception as e:
                         print(f"  LinkedIn card error: {e}")

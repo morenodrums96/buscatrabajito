@@ -136,6 +136,7 @@ def save_match(user_id: str, job: dict):
         "location": job["location"],
         "link": job["link"],
         "source": job["source"],
+        "posted_date": job.get("posted_date", ""),
         "seen_at": now,
         "notified": False,
     })
