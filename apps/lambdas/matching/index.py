@@ -104,19 +104,48 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
         print("  NO MATCH (location genérico sin ciudad/estado)")
         return False
 
-    # Estados — comparación sin acentos contra los municipios reales del
-    # estado (catálogo en DynamoDB), ya que LinkedIn/Computrabajo/etc.
-    # casi siempre traen la ciudad ("Monterrey, Nuevo León, México") y no
-    # el nombre del estado. También se compara contra el nombre del
-    # estado por si el location viene sin ciudad (ej. "Nuevo León, México").
+    # Estados — el location normalmente viene como "Ciudad, Estado, País"
+    # (ej. "Monterrey, Nuevo León, México"). Varios municipios se llaman
+    # igual en distintos estados (ej. "Juárez" existe en Nuevo León Y en
+    # Chihuahua/Ciudad Juárez; "Hidalgo" existe en Nuevo León Y es nombre
+    # de otro estado) — comparar el nombre del municipio contra el string
+    # completo genera falsos positivos ("Juárez, Chihuahua, México" hacía
+    # match con Nuevo León solo porque Nuevo León también tiene un
+    # municipio llamado Juárez). Para evitarlo: si el location tiene el
+    # formato de 3+ partes, el segmento de estado (penúltimo, antes del
+    # país) manda por sí solo — no se revisan municipios, porque ya
+    # sabemos en qué estado está la vacante. Si el location no tiene ese
+    # formato (ej. "Nuevo León, México" sin ciudad, o "Remoto"), se cae
+    # de regreso a comparar contra el string completo (estado + municipios).
+    ALIAS_ESTADO = {
+        "nuevo leon": ["nl", "monterrey", "mty"],
+        "ciudad de mexico": ["cdmx", "df", "distrito federal"],
+        "estado de mexico": ["edomex", "mexico"],
+        "jalisco": ["gdl", "guadalajara"],
+    }
+
     job_location_plain = strip_accents(job_location)
+    partes = [p.strip() for p in job_location.split(",")]
+    estado_en_location_plain = strip_accents(partes[-2].lower()) if len(partes) >= 3 else None
+
     for estado in estados:
-        municipios = get_municipios_por_estado(estado)
-        terminos = [estado] + municipios
-        terminos_plain = [strip_accents(t.lower()) for t in terminos]
-        if any(t in job_location_plain for t in terminos_plain):
-            print(f"  MATCH por estado: {estado}")
-            return True
+        estado_plain = strip_accents(estado.lower())
+
+        if estado_en_location_plain is not None:
+            coincide = (
+                estado_plain == estado_en_location_plain
+                or estado_plain in estado_en_location_plain
+                or estado_en_location_plain in ALIAS_ESTADO.get(estado_plain, [])
+            )
+            if coincide:
+                print(f"  MATCH por estado (segmento de estado): {estado}")
+                return True
+        else:
+            municipios = get_municipios_por_estado(estado)
+            terminos_plain = [estado_plain] + [strip_accents(m.lower()) for m in municipios]
+            if any(t in job_location_plain for t in terminos_plain):
+                print(f"  MATCH por estado (fallback, sin formato claro): {estado}")
+                return True
 
     print(f"  NO MATCH")
     return False

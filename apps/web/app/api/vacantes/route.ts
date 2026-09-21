@@ -6,11 +6,15 @@ import { NextResponse } from "next/server";
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const db = DynamoDBDocumentClient.from(client);
 
-const ABREVIATURAS: Record<string, string[]> = {
-  "nuevo león": ["nuevo leon", "nl", "monterrey", "mty"],
-  "ciudad de méxico": ["cdmx", "df", "ciudad de mexico"],
-  "jalisco": ["jalisco", "guadalajara", "gdl"],
-  "estado de méxico": ["edomex", "estado de mexico", "toluca"],
+// Alias que puede traer el segmento de estado de un location tipo
+// "Ciudad, Estado, País" (ej. "Miguel Hidalgo, CDMX, Ciudad de México,
+// México" -> segmento "cdmx"). Solo se usan para comparar ESE segmento,
+// nunca el string completo (ver por qué en coincideConPreferencias).
+const ALIAS_ESTADO: Record<string, string[]> = {
+  "nuevo leon": ["nl", "monterrey", "mty"],
+  "ciudad de mexico": ["cdmx", "df", "distrito federal"],
+  "estado de mexico": ["edomex", "mexico"],
+  "jalisco": ["gdl", "guadalajara"],
 };
 
 function stripAccents(text: string) {
@@ -34,10 +38,29 @@ function coincideConPreferencias(
     }
   }
 
+  // El location normalmente viene como "Ciudad, Estado, País". Varios
+  // municipios se llaman igual en distintos estados (ej. "Juárez" existe
+  // en Nuevo León Y en Chihuahua) — comparar contra el string completo
+  // genera falsos positivos. Si hay 3+ partes, el segmento de estado
+  // (penúltimo, antes del país) manda por sí solo. Si no (ej. "Nuevo
+  // León, México" sin ciudad, o "Remoto"), se cae a comparar el estado
+  // contra el string completo (sin municipios, para no arriesgar).
+  const partes = location.split(",").map((p) => p.trim());
+  const estadoEnLocationPlain = partes.length >= 3 ? stripAccents(partes[partes.length - 2]) : null;
+
   return estadosDeseados.some((estado) => {
-    const estadoLower = estado.toLowerCase();
-    const terminos = ABREVIATURAS[estadoLower] ?? [estadoLower, estadoLower.slice(0, 4)];
-    return terminos.some((t) => locationPlain.includes(stripAccents(t)));
+    const estadoPlain = stripAccents(estado.toLowerCase());
+
+    if (estadoEnLocationPlain !== null) {
+      const alias = ALIAS_ESTADO[estadoPlain] ?? [];
+      return (
+        estadoPlain === estadoEnLocationPlain ||
+        estadoEnLocationPlain.includes(estadoPlain) ||
+        alias.includes(estadoEnLocationPlain)
+      );
+    }
+
+    return locationPlain.includes(estadoPlain);
   });
 }
 

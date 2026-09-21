@@ -237,17 +237,26 @@ def is_relevant_remote(title: str, keywords: list[str]) -> bool:
     return any(k in title_l for k in keywords)
 
 
-def safe_get(url: str, timeout: int = 15) -> requests.Response | None:
-    try:
-        time.sleep(random.uniform(1.0, 2.5))
-        r = requests.get(url, headers=random_headers(), timeout=timeout)
-        if r.status_code == 200:
-            return r
-        print(f"  HTTP {r.status_code}: {url[:80]}")
-        return None
-    except Exception as e:
-        print(f"  Error GET: {e} → {url[:80]}")
-        return None
+def safe_get(url: str, timeout: int = 15, retries: int = 1) -> requests.Response | None:
+    for attempt in range(retries + 1):
+        try:
+            time.sleep(random.uniform(1.0, 2.5))
+            r = requests.get(url, headers=random_headers(), timeout=timeout)
+            if r.status_code == 200:
+                return r
+            # 429 = rate limit — con más páginas por término (MAX_PAGES=6)
+            # el volumen de requests sube y LinkedIn empieza a limitarnos.
+            # Un reintento con espera larga suele bastar sin sacrificar cobertura.
+            if r.status_code == 429 and attempt < retries:
+                print(f"  HTTP 429, esperando antes de reintentar: {url[:80]}")
+                time.sleep(random.uniform(8.0, 15.0))
+                continue
+            print(f"  HTTP {r.status_code}: {url[:80]}")
+            return None
+        except Exception as e:
+            print(f"  Error GET: {e} → {url[:80]}")
+            return None
+    return None
 
 
 # ── Scrapers ──────────────────────────────────────────────────────
