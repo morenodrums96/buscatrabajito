@@ -31,6 +31,17 @@ function timeAgo(timestamp: number): string {
   return `Hace ${Math.floor(diff / 86400)} días`;
 }
 
+function formatFechaHora(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Mexico_City",
+  });
+}
+
 export default function VacantesPage() {
   const [vacantes, setVacantes] = useState<Vacante[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +114,9 @@ export default function VacantesPage() {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SOURCE_COLORS[vacante.source] ?? "bg-slate-100 text-slate-600"}`}>
                   {vacante.source}
                 </span>
-                <span className="text-[11px] text-slate-400">{timeAgo(vacante.seen_at)}</span>
+                <span className="text-[11px] text-slate-400">
+                  {timeAgo(vacante.seen_at)} · {formatFechaHora(vacante.seen_at)}
+                </span>
               </div>
 
               <h2 className="font-extrabold text-base text-[#0F2744] mb-1" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
