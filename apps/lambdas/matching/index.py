@@ -155,14 +155,34 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
 
     estados = profile.get("estados", [])
     remoto_usa = profile.get("remotoUSA", False)
-    modalidades = profile.get("modalidades", [])
+    modalidades = profile.get("modalidades", [])  # legado, ver fallback abajo
+    modalidad_por_estado = profile.get("modalidadPorEstado") or {}
+    MODALIDADES_DEFAULT = ["Remoto", "Híbrido", "Presencial"]
 
-    print(f"  estados={estados} | location={job_location}")
+    print(f"  estados={estados} | modalidadPorEstado={modalidad_por_estado} | location={job_location}")
 
-    # Remoto
-    if "Remoto" in modalidades:
-        if any(word in job_location for word in ["remoto", "remote", "anywhere"]):
+    # ¿El usuario quiere remoto en AL MENOS uno de sus estados? Se usa
+    # para las fuentes sin estado real (ver abajo) y como red de
+    # seguridad para perfiles viejos sin modalidadPorEstado.
+    quiere_remoto = any("Remoto" in mods for mods in modalidad_por_estado.values()) or "Remoto" in modalidades
+
+    # Job "remoto" por palabras clave — se mira título Y location, porque
+    # LinkedIn casi siempre pone "Remote Work" en el título y deja la
+    # location como la ciudad de la empresa (ej. "Monterrey, Nuevo León").
+    job_es_remoto = any(
+        word in job_location or word in job_title for word in ["remoto", "remote", "anywhere"]
+    )
+
+    # Fuentes 100% remotas sin estado real (Freelancer.com, Remotive,
+    # WeWorkRemotely, Himalayas) — todas guardan location="Remoto" literal.
+    # No hay estado que comparar, así que solo importa si el usuario
+    # quiere remoto en general.
+    if job_location.strip() == "remoto":
+        if quiere_remoto:
+            print("  MATCH (fuente 100% remota, usuario quiere remoto)")
             return True
+        print("  NO MATCH (fuente 100% remota, usuario no quiere remoto)")
+        return False
 
     # USA
     if remoto_usa and job.get("source") in ["Remotive", "WeWorkRemotely", "Himalayas"]:
@@ -173,7 +193,7 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     loc_clean = job_location.strip()
     GENERIC_LOCATIONS = {"méxico", "mexico", "méxico, méxico", "mexico, mexico"}
     if loc_clean in GENERIC_LOCATIONS:
-        if "Remoto" in modalidades:
+        if quiere_remoto:
             return True  # podría ser remota
         print("  NO MATCH (location genérico sin ciudad/estado)")
         return False
@@ -216,15 +236,26 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
                 or estado_plain in estado_en_location_plain
                 or estado_en_location_plain in ALIAS_ESTADO.get(estado_plain, [])
             )
-            if coincide:
-                print(f"  MATCH por estado (segmento de estado): {estado}")
-                return True
         else:
             municipios = get_municipios_por_estado(estado)
             terminos_plain = [estado_plain] + [strip_accents(m.lower()) for m in municipios]
-            if any(t in job_location_plain for t in terminos_plain):
-                print(f"  MATCH por estado (fallback, sin formato claro): {estado}")
-                return True
+            coincide = any(t in job_location_plain for t in terminos_plain)
+
+        if not coincide:
+            continue
+
+        # El estado coincide — ahora hay que ver si la modalidad de ESTA
+        # vacante (remota o no) está permitida para ESE estado específico.
+        # Sin configuración por estado, cae al campo legado modalidades
+        # (perfiles guardados antes de esta función) y si tampoco hay eso,
+        # se permite cualquier modalidad (así se comportaba antes).
+        mods = modalidad_por_estado.get(estado) or modalidades or MODALIDADES_DEFAULT
+        modalidad_ok = ("Remoto" in mods) if job_es_remoto else ("Híbrido" in mods or "Presencial" in mods)
+
+        if modalidad_ok:
+            print(f"  MATCH por estado: {estado} (modalidad ok, job_es_remoto={job_es_remoto}, mods={mods})")
+            return True
+        print(f"  estado {estado} coincide pero modalidad no aplica (job_es_remoto={job_es_remoto}, mods={mods})")
 
     print(f"  NO MATCH")
     return False

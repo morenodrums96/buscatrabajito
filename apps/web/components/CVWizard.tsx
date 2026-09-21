@@ -56,6 +56,11 @@ export interface CVData {
   disponibilidad?: string;
   estado?: string;
   estadosDeseados?: string[];
+  // Modalidad (Remoto/Híbrido/Presencial) configurada por estado — permite
+  // ej. "Nuevo León: las 3" pero "CDMX/Guadalajara/resto del país: solo
+  // Remoto". Si un estado seleccionado no tiene entrada aquí, se usa
+  // modalidadDeseada como respaldo (perfiles viejos sin esta granularidad).
+  modalidadPorEstado?: Record<string, string[]>;
   salarioDeseado?: string;
   aniosExperiencia?: string;
   extractoProfesional?: string;
@@ -89,6 +94,7 @@ const EMPTY_CV: CVData = {
   disponibilidad: "",
   estado: "",
   estadosDeseados: [],
+  modalidadPorEstado: {},
   salarioDeseado: "",
   aniosExperiencia: "",
   extractoProfesional: "",

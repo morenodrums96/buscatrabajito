@@ -67,14 +67,22 @@ function detectarTipoEmpleo(titulo: string): string {
 // buscatrabajito-matching, para que "Vacantes encontradas" solo muestre
 // lo que de verdad coincide con tus preferencias ACTUALES (no lo que
 // coincidía cuando se guardó el match).
+const MODALIDADES_DEFAULT = ["Remoto", "Híbrido", "Presencial"];
+
+// Misma lógica de coincidencia por estado/remoto/idioma/tipo de empleo
+// que usa buscatrabajito-matching, para que "Vacantes encontradas" solo
+// muestre lo que de verdad coincide con tus preferencias ACTUALES (no lo
+// que coincidía cuando se guardó el match).
 function coincideConPreferencias(
   job: Record<string, unknown>,
   estadosDeseados: string[],
   modalidadDeseada: string[],
+  modalidadPorEstado: Record<string, string[]>,
   idiomasDeseados: string[],
   tiposTrabajoDeseados: string[]
 ) {
   const location = String(job.location ?? "").toLowerCase();
+  const title = String(job.title ?? "").toLowerCase();
   const locationPlain = stripAccents(location);
 
   if (idiomasDeseados.length > 0) {
@@ -99,10 +107,22 @@ function coincideConPreferencias(
     }
   }
 
-  if (modalidadDeseada.includes("Remoto")) {
-    if (["remoto", "remote", "anywhere"].some((w) => location.includes(w))) {
-      return true;
-    }
+  // ¿El usuario quiere remoto en AL MENOS uno de sus estados? Se usa para
+  // las fuentes sin estado real y como red de seguridad para perfiles
+  // viejos sin modalidadPorEstado.
+  const quiereRemoto =
+    Object.values(modalidadPorEstado).some((mods) => mods.includes("Remoto")) ||
+    modalidadDeseada.includes("Remoto");
+
+  // Job "remoto" por palabras clave — se mira título Y location, porque
+  // LinkedIn casi siempre pone "Remote Work" en el título y deja la
+  // location como la ciudad de la empresa.
+  const jobEsRemoto = ["remoto", "remote", "anywhere"].some((w) => location.includes(w) || title.includes(w));
+
+  // Fuentes 100% remotas sin estado real (Freelancer.com, Remotive,
+  // WeWorkRemotely, Himalayas) — todas guardan location="Remoto" literal.
+  if (location.trim() === "remoto") {
+    return quiereRemoto;
   }
 
   // Sin estado seleccionado (ej. usuario solo configuró idioma o
@@ -124,16 +144,23 @@ function coincideConPreferencias(
   return estadosDeseados.some((estado) => {
     const estadoPlain = stripAccents(estado.toLowerCase());
 
+    let coincide: boolean;
     if (estadoEnLocationPlain !== null) {
       const alias = ALIAS_ESTADO[estadoPlain] ?? [];
-      return (
+      coincide =
         estadoPlain === estadoEnLocationPlain ||
         estadoEnLocationPlain.includes(estadoPlain) ||
-        alias.includes(estadoEnLocationPlain)
-      );
+        alias.includes(estadoEnLocationPlain);
+    } else {
+      coincide = locationPlain.includes(estadoPlain);
     }
 
-    return locationPlain.includes(estadoPlain);
+    if (!coincide) return false;
+
+    // El estado coincide — ahora hay que ver si la modalidad de ESTA
+    // vacante (remota o no) está permitida para ESE estado específico.
+    const mods = modalidadPorEstado[estado] ?? (modalidadDeseada.length > 0 ? modalidadDeseada : MODALIDADES_DEFAULT);
+    return jobEsRemoto ? mods.includes("Remoto") : mods.includes("Híbrido") || mods.includes("Presencial");
   });
 }
 
@@ -162,6 +189,7 @@ export async function GET() {
 
   const estadosDeseados: string[] = cvResult.Item?.estadosDeseados ?? [];
   const modalidadDeseada: string[] = cvResult.Item?.modalidadDeseada ?? [];
+  const modalidadPorEstado: Record<string, string[]> = cvResult.Item?.modalidadPorEstado ?? {};
   const idiomasDeseados: string[] = cvResult.Item?.idiomasVacantes ?? [];
   const tiposTrabajoDeseados: string[] = cvResult.Item?.tipoJornada ?? [];
 
@@ -187,7 +215,7 @@ export async function GET() {
   }
 
   const items = (jobsResult.Items ?? [])
-    .filter((job) => sinPreferencias || coincideConPreferencias(job, estadosDeseados, modalidadDeseada, idiomasDeseados, tiposTrabajoDeseados))
+    .filter((job) => sinPreferencias || coincideConPreferencias(job, estadosDeseados, modalidadDeseada, modalidadPorEstado, idiomasDeseados, tiposTrabajoDeseados))
     .sort((a, b) => fechaParaOrdenar(b) - fechaParaOrdenar(a));
 
   return NextResponse.json(items);

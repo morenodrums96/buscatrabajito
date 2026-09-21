@@ -220,6 +220,26 @@ export default function CVPage() {
   const todoMexico =
     (cvData?.estadosDeseados?.length ?? 0) === nombresEstados.length;
 
+  // Agrupa los estados seleccionados por su combinación exacta de
+  // modalidad (ej. "Remoto" | "Remoto, Híbrido" | "Remoto, Híbrido,
+  // Presencial"), para el tablero de un vistazo.
+  const gruposModalidad: { combo: string[]; estados: string[] }[] = (() => {
+    const porCombo = new Map<string, string[]>();
+    for (const estado of cvData?.estadosDeseados ?? []) {
+      const combo = MODALIDADES.filter(m =>
+        (cvData?.modalidadPorEstado?.[estado] ?? MODALIDADES).includes(m)
+      );
+      const key = combo.join(", ") || "Sin modalidad";
+      porCombo.set(key, [...(porCombo.get(key) ?? []), estado]);
+    }
+    return Array.from(porCombo.entries())
+      .map(([key, estados]) => ({
+        combo: key === "Sin modalidad" ? [] : key.split(", "),
+        estados: estados.sort(),
+      }))
+      .sort((a, b) => b.estados.length - a.estados.length);
+  })();
+
   // ============================================================
   // CARGAR DATOS
   // ============================================================
@@ -576,6 +596,7 @@ export default function CVPage() {
           estados: cvData.estadosDeseados ?? [],
           remotoUSA,
           modalidades: cvData.modalidadDeseada ?? [],
+          modalidadPorEstado: cvData.modalidadPorEstado ?? {},
           tiposTrabajo: cvData.tipoJornada ?? [],
           idiomasVacantes: cvData.idiomasVacantes ?? [],
           nivelProfesional,
@@ -732,41 +753,91 @@ export default function CVPage() {
       if (!d) return d;
 
       const actuales = d.estadosDeseados ?? [];
+      const seActiva = !actuales.includes(e);
+      const modalidadPorEstado = { ...(d.modalidadPorEstado ?? {}) };
+
+      if (seActiva) {
+        // Estado nuevo: arranca con las 3 modalidades activas, el usuario
+        // las va desmarcando por estado si quiere restringir.
+        modalidadPorEstado[e] = [...MODALIDADES];
+      } else {
+        delete modalidadPorEstado[e];
+      }
 
       return {
         ...d,
-        estadosDeseados: actuales.includes(e)
-          ? actuales.filter(x => x !== e)
-          : [...actuales, e],
+        estadosDeseados: seActiva
+          ? [...actuales, e]
+          : actuales.filter(x => x !== e),
+        modalidadPorEstado,
       };
     });
   }
 
   function toggleTodoMexico() {
-    setCvData(d =>
-      d
-        ? {
-            ...d,
-            estadosDeseados: todoMexico ? [] : [...nombresEstados],
-          }
-        : d
-    );
-  }
-
-  function toggleModalidad(m: string) {
     setCvData(d => {
       if (!d) return d;
 
-      const actuales = d.modalidadDeseada ?? [];
+      if (todoMexico) {
+        // Quitar todos: limpia selección y su configuración de modalidad.
+        return { ...d, estadosDeseados: [], modalidadPorEstado: {} };
+      }
+
+      // Agregar todos: los estados que ya tenían modalidad configurada
+      // (personalizados a mano) la conservan tal cual; los nuevos arrancan
+      // con las 3 modalidades activas.
+      const modalidadPorEstado = { ...(d.modalidadPorEstado ?? {}) };
+      for (const estado of nombresEstados) {
+        if (!modalidadPorEstado[estado]) {
+          modalidadPorEstado[estado] = [...MODALIDADES];
+        }
+      }
+
+      return { ...d, estadosDeseados: [...nombresEstados], modalidadPorEstado };
+    });
+  }
+
+  function toggleModalidadEstado(estado: string, modalidad: string) {
+    setCvData(d => {
+      if (!d) return d;
+
+      const actuales = d.modalidadPorEstado?.[estado] ?? [...MODALIDADES];
+      const nuevas = actuales.includes(modalidad)
+        ? actuales.filter(x => x !== modalidad)
+        : [...actuales, modalidad];
 
       return {
         ...d,
-        modalidadDeseada: actuales.includes(m)
-          ? actuales.filter(x => x !== m)
-          : [...actuales, m],
+        modalidadPorEstado: { ...(d.modalidadPorEstado ?? {}), [estado]: nuevas },
       };
     });
   }
+
+  // Reasigna de un jalón la modalidad de TODOS los estados de un grupo del
+  // tablero (ej. cambiar "CDMX + Guadalajara" de "Solo Remoto" a "Remoto +
+  // Híbrido" sin tener que tocarlos uno por uno).
+  function toggleModalidadGrupo(estadosGrupo: string[], modalidad: string) {
+    setCvData(d => {
+      if (!d) return d;
+
+      const modalidadPorEstado = { ...(d.modalidadPorEstado ?? {}) };
+      const todosLaTienen = estadosGrupo.every(es =>
+        (modalidadPorEstado[es] ?? []).includes(modalidad)
+      );
+
+      for (const es of estadosGrupo) {
+        const actuales = modalidadPorEstado[es] ?? [];
+        modalidadPorEstado[es] = todosLaTienen
+          ? actuales.filter(x => x !== modalidad)
+          : actuales.includes(modalidad)
+            ? actuales
+            : [...actuales, modalidad];
+      }
+
+      return { ...d, modalidadPorEstado };
+    });
+  }
+
 
   // Freelance / Proyecto SÍ puede combinarse con modalidad: fuentes como
   // Freelancer.com son 100% remotas, así que necesitamos que el usuario
@@ -1959,36 +2030,63 @@ export default function CVPage() {
 
                   </div>
 
+                  <p className="text-[10px] text-slate-400 -mt-1">
+                    Por cada estado que actives, elige qué modalidad
+                    aplica ahí (R = Remoto, H = Híbrido, P = Presencial) —
+                    por ejemplo tu estado puede tener las 3, y otros
+                    estados donde no puedes estar físicamente, solo Remoto.
+                  </p>
+
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
                     {nombresEstados.map(
-                      e => (
+                      e => {
+                        const activo = (cvData.estadosDeseados ?? []).includes(e);
+                        const modalidadesEstado = cvData.modalidadPorEstado?.[e] ?? MODALIDADES;
 
-                        <button
-                          key={e}
-                          onClick={() =>
-                            toggleEstado(e)
-                          }
-                          className={`
-                            px-2.5
-                            py-1.5
-                            rounded-lg
-                            text-[11px]
-                            font-semibold
-                            border
-                            transition-all
-                            cursor-pointer
-                            ${
-                              (cvData.estadosDeseados ?? []).includes(e)
-                                ? "bg-[#2563EB] text-white border-[#2563EB]"
-                                : "bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300"
-                            }
-                          `}
-                        >
-                          {e}
-                        </button>
+                        return (
+                          <div
+                            key={e}
+                            className={`
+                              rounded-lg border transition-all overflow-hidden
+                              ${activo ? "border-[#2563EB]" : "border-slate-200"}
+                            `}
+                          >
+                            <button
+                              onClick={() => toggleEstado(e)}
+                              className={`
+                                w-full text-left px-2.5 py-1.5 text-[11px] font-semibold
+                                cursor-pointer
+                                ${activo ? "bg-[#2563EB] text-white" : "bg-slate-50 text-slate-600 hover:border-blue-300"}
+                              `}
+                            >
+                              {e}
+                            </button>
 
-                      )
+                            {activo && (
+                              <div className="flex gap-1 px-2 py-1.5 bg-blue-50/40">
+                                {MODALIDADES.map(m => (
+                                  <button
+                                    key={m}
+                                    onClick={() => toggleModalidadEstado(e, m)}
+                                    title={m}
+                                    className={`
+                                      flex-1 py-0.5 rounded text-[9px] font-bold border cursor-pointer transition-all
+                                      ${
+                                        modalidadesEstado.includes(m)
+                                          ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                          : "bg-white text-slate-400 border-slate-200"
+                                      }
+                                    `}
+                                  >
+                                    {m[0]}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
                     )}
 
                   </div>
@@ -1996,58 +2094,71 @@ export default function CVPage() {
                 </div>
 
                 {/* ------------------------------------------ */}
-                {/* MODALIDAD Y CONTRATO                         */}
+                {/* TABLERO: MODALIDAD POR ESTADO, AGRUPADO       */}
+                {/* ------------------------------------------ */}
+
+                {gruposModalidad.length > 0 && (
+
+                  <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-3">
+
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
+                      Modalidad por estado — de un vistazo
+                    </h3>
+
+                    <div className="space-y-3">
+                      {gruposModalidad.map(grupo => (
+                        <div key={grupo.estados.join("|")} className="border border-slate-100 rounded-xl p-3 space-y-2">
+
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex gap-1">
+                              {MODALIDADES.map(m => (
+                                <button
+                                  key={m}
+                                  onClick={() => toggleModalidadGrupo(grupo.estados, m)}
+                                  className={`
+                                    px-2 py-1 rounded-lg text-[10px] font-bold border cursor-pointer transition-all
+                                    ${
+                                      grupo.combo.includes(m)
+                                        ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                        : "bg-slate-50 text-slate-500 border-slate-200"
+                                    }
+                                  `}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              {grupo.estados.length} estado{grupo.estados.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            {grupo.estados.map(estado => (
+                              <span
+                                key={estado}
+                                className="text-[10px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200"
+                              >
+                                {estado}
+                              </span>
+                            ))}
+                          </div>
+
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+
+                )}
+
+                {/* ------------------------------------------ */}
+                {/* TIPO DE EMPLEO E IDIOMA                      */}
                 {/* ------------------------------------------ */}
 
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
 
                   <div>
-
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      Modalidad de Trabajo
-                    </h3>
-
-                    <div className="flex flex-wrap gap-2">
-
-                      {MODALIDADES.map(
-                        m => (
-
-                          <button
-                            key={m}
-                            onClick={() =>
-                              toggleModalidad(m)
-                            }
-                            className={`
-                              px-3
-                              py-1.5
-                              rounded-xl
-                              text-xs
-                              font-semibold
-                              border
-                              transition-all
-                              cursor-pointer
-                              disabled:opacity-40
-                              disabled:cursor-not-allowed
-                              ${
-                                (cvData.modalidadDeseada ?? []).includes(
-                                  m
-                                )
-                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
-                                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300"
-                              }
-                            `}
-                          >
-                            {m}
-                          </button>
-
-                        )
-                      )}
-
-                    </div>
-
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100">
 
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Tipo de Empleo
