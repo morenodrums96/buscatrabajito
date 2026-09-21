@@ -71,9 +71,22 @@ export async function GET() {
   // resultados antes de que el usuario termine de configurar su perfil.
   const sinPreferencias = estadosDeseados.length === 0 && modalidadDeseada.length === 0;
 
+  // Ordena por la fecha real de publicación (posted_date, ej. LinkedIn)
+  // cuando existe — así "más reciente" refleja cuándo se publicó la
+  // vacante, no cuándo la encontró el scraper. Si no hay posted_date
+  // (otras fuentes sin ese dato), cae de regreso a seen_at.
+  function fechaParaOrdenar(job: Record<string, unknown>): number {
+    const postedDate = job.posted_date as string | undefined;
+    if (postedDate) {
+      const ts = new Date(`${postedDate}T00:00:00Z`).getTime();
+      if (!Number.isNaN(ts)) return ts / 1000;
+    }
+    return (job.seen_at as number) ?? 0;
+  }
+
   const items = (jobsResult.Items ?? [])
     .filter((job) => sinPreferencias || coincideConPreferencias(job, estadosDeseados, modalidadDeseada))
-    .sort((a, b) => (b.seen_at ?? 0) - (a.seen_at ?? 0));
+    .sort((a, b) => fechaParaOrdenar(b) - fechaParaOrdenar(a));
 
   return NextResponse.json(items);
 }
