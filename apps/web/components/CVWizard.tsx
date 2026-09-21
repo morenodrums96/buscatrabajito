@@ -59,6 +59,7 @@ export interface CVData {
   salarioDeseado?: string;
   aniosExperiencia?: string;
   extractoProfesional?: string;
+  idiomasVacantes?: string[];
 }
 
 interface Props {
@@ -91,6 +92,7 @@ const EMPTY_CV: CVData = {
   salarioDeseado: "",
   aniosExperiencia: "",
   extractoProfesional: "",
+  idiomasVacantes: [],
 };
 
 const NIVELES_IDIOMA = [
@@ -128,6 +130,8 @@ const TIPOS_JORNADA = [
   "Freelance / Proyecto",
   "Prácticas / Becario",
 ];
+
+const IDIOMAS_VACANTES = ["Español", "Inglés"];
 
 const OPCIONES_DISPONIBILIDAD = [
   "Inmediata",
@@ -852,7 +856,7 @@ export default function AIProfileBuilder({
   }
 
   function toggleEnLista(
-    field: "modalidadDeseada" | "estadosDeseados",
+    field: "modalidadDeseada" | "estadosDeseados" | "idiomasVacantes",
     item: string
   ) {
     const actuales = data[field] ?? [];
@@ -1990,6 +1994,28 @@ export default function AIProfileBuilder({
                       }`}
                     >
                       {tipo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <p className="text-xs font-bold text-slate-500">
+                  Idioma de las vacantes
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {IDIOMAS_VACANTES.map((idioma) => (
+                    <button
+                      key={idioma}
+                      type="button"
+                      onClick={() => toggleEnLista("idiomasVacantes", idioma)}
+                      className={`min-h-[40px] px-4 rounded-[10px] text-xs font-bold border transition-all ${
+                        data.idiomasVacantes?.includes(idioma)
+                          ? "border-[#2563eb] bg-[#eff6ff] text-[#1e3a5f]"
+                          : "border-[#e2e8f0] bg-white text-slate-500 hover:border-[#93c5fd]"
+                      }`}
+                    >
+                      {idioma}
                     </button>
                   ))}
                 </div>

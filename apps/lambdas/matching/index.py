@@ -66,6 +66,47 @@ def get_user_data(user_id: str) -> dict:
     return {"email": sp.get("email", ""), "nombre": sp.get("nombreCompleto", "")}
 
 
+IDIOMA_CODIGOS = {"Español": "es", "Inglés": "en"}
+
+# Sin librerías de detección de idioma (para no inflar el paquete del
+# Lambda): si el título trae conectores o palabras de puesto típicas del
+# español, se asume español; si no, inglés (LinkedIn y la mayoría de
+# fuentes devuelven títulos en inglés por default). Ya viene sin acentos
+# porque se compara contra strip_accents(texto).
+PALABRAS_CONECTORAS_ES = {"de", "del", "para", "con", "en", "y"}
+PALABRAS_PUESTO_ES = {
+    "gerente", "desarrollador", "desarrolladora", "ingeniero", "ingeniera",
+    "analista", "director", "directora", "lider", "encargado", "encargada",
+    "auxiliar", "ejecutivo", "ejecutiva", "vendedor", "vendedora", "contador",
+    "contadora", "disenador", "disenadora", "atencion", "cliente", "ventas",
+    "recursos", "humanos", "practicante", "asistente", "representante",
+    "coordinador", "coordinadora", "supervisor", "supervisora",
+    "especialista", "responsable", "jefe", "jefa",
+}
+
+
+def detectar_idioma(texto: str) -> str:
+    palabras = set(strip_accents(texto.lower()).split())
+    if palabras & PALABRAS_CONECTORAS_ES or palabras & PALABRAS_PUESTO_ES:
+        return "es"
+    return "en"
+
+
+# Igual que el idioma: no tenemos un campo explícito de tipo de empleo en
+# las fuentes que scrapeamos, así que se infiere del título con palabras
+# clave. "Tiempo completo" es el default cuando no hay ninguna señal más
+# específica, porque es lo más común y casi nunca se anuncia en el título.
+def detectar_tipo_empleo(titulo: str) -> str:
+    t = strip_accents(titulo.lower())
+    if any(p in t for p in ["becario", "becaria", "practicante", "practicas", "intern", "trainee"]):
+        return "Prácticas / Becario"
+    if any(p in t for p in ["freelance", "por proyecto", "project-based", "temporal", "temporary"]):
+        return "Freelance / Proyecto"
+    if any(p in t for p in ["medio tiempo", "part time", "part-time", "parcial"]):
+        return "Medio tiempo"
+    return "Tiempo completo"
+
+
 def job_matches_profile(job: dict, profile: dict) -> bool:
     puesto = profile.get("puesto", "").lower()
     terminos_busqueda = profile.get("terminos_busqueda") or []
@@ -86,6 +127,27 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     
     if not title_match:
         return False
+
+    # Idioma deseado — se filtra antes de mirar ubicación/modalidad para
+    # que aplique sin importar por qué ruta se decida el match (remoto,
+    # USA o estado). Si no seleccionó nada, o seleccionó ambos idiomas,
+    # el set de códigos deseados cubre cualquier resultado y no filtra.
+    idiomas_deseados = profile.get("idiomasVacantes") or []
+    if idiomas_deseados:
+        codigos_deseados = {IDIOMA_CODIGOS[i] for i in idiomas_deseados if i in IDIOMA_CODIGOS}
+        idioma_job = detectar_idioma(job.get("title", ""))
+        if codigos_deseados and idioma_job not in codigos_deseados:
+            print(f"  NO MATCH (idioma detectado={idioma_job}, deseado={idiomas_deseados})")
+            return False
+
+    # Tipo de empleo deseado (Tiempo completo / Medio tiempo / Freelance /
+    # Prácticas). Mismo criterio: sin selección, no filtra.
+    tipos_deseados = profile.get("tiposTrabajo") or []
+    if tipos_deseados:
+        tipo_job = detectar_tipo_empleo(job.get("title", ""))
+        if tipo_job not in tipos_deseados:
+            print(f"  NO MATCH (tipo de empleo detectado={tipo_job}, deseado={tipos_deseados})")
+            return False
 
     estados = profile.get("estados", [])
     remoto_usa = profile.get("remotoUSA", False)
@@ -131,6 +193,11 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
         "estado de mexico": ["edomex", "mexico"],
         "jalisco": ["gdl", "guadalajara"],
     }
+
+    # Sin estado seleccionado (ej. el usuario solo configuró idioma o
+    # modalidad): no hay nada que comparar aquí, así que no se descarta.
+    if not estados:
+        return True
 
     job_location_plain = strip_accents(job_location)
     partes = [p.strip() for p in job_location.split(",")]

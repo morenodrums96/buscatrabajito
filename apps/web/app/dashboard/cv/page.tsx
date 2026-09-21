@@ -85,6 +85,8 @@ const TIPOS_TRABAJO = [
   "Prácticas / Becario",
 ];
 
+const IDIOMAS_VACANTES = ["Español", "Inglés"];
+
 const OPCIONES_DISPONIBILIDAD = [
   "Inmediata",
   "1 a 2 semanas",
@@ -575,6 +577,7 @@ export default function CVPage() {
           remotoUSA,
           modalidades: cvData.modalidadDeseada ?? [],
           tiposTrabajo: cvData.tipoJornada ?? [],
+          idiomasVacantes: cvData.idiomasVacantes ?? [],
           nivelProfesional,
           salarioMinimo: salarioMin
             ? parseInt(salarioMin)
@@ -783,6 +786,22 @@ export default function CVPage() {
           seActiva && t === "Freelance / Proyecto"
             ? []
             : d.modalidadDeseada,
+      };
+    });
+  }
+
+  function toggleIdiomaVacante(idioma: string) {
+    setCvData(d => {
+      if (!d) return d;
+
+      const actuales = d.idiomasVacantes ?? [];
+      const seActiva = !actuales.includes(idioma);
+
+      return {
+        ...d,
+        idiomasVacantes: seActiva
+          ? [...actuales, idioma]
+          : actuales.filter(x => x !== idioma),
       };
     });
   }
@@ -2043,7 +2062,7 @@ export default function CVPage() {
                   <div className="pt-2 border-t border-slate-100">
 
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      Tipo de Contrato
+                      Tipo de Empleo
                     </h3>
 
                     <div className="flex flex-wrap gap-2">
@@ -2075,6 +2094,50 @@ export default function CVPage() {
                             `}
                           >
                             {t}
+                          </button>
+
+                        )
+                      )}
+
+                    </div>
+
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                      Idioma de las Vacantes
+                    </h3>
+
+                    <div className="flex flex-wrap gap-2">
+
+                      {IDIOMAS_VACANTES.map(
+                        idioma => (
+
+                          <button
+                            key={idioma}
+                            onClick={() =>
+                              toggleIdiomaVacante(idioma)
+                            }
+                            className={`
+                              px-3
+                              py-1.5
+                              rounded-xl
+                              text-xs
+                              font-semibold
+                              border
+                              transition-all
+                              cursor-pointer
+                              ${
+                                (cvData.idiomasVacantes ?? []).includes(
+                                  idioma
+                                )
+                                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                                  : "bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300"
+                              }
+                            `}
+                          >
+                            {idioma}
                           </button>
 
                         )
