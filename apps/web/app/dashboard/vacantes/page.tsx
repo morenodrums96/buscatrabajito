@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, MapPin, Building2, Sparkles, Loader2 } from "lucide-react";
+import {
+  ExternalLink,
+  MapPin,
+  Building2,
+  Sparkles,
+  Loader2,
+  Search,
+  Check,
+  Copy,
+  Calendar,
+  Clock,
+  Briefcase,
+  Filter,
+} from "lucide-react";
 
 interface Vacante {
   SK: string;
@@ -12,23 +25,20 @@ interface Vacante {
   link: string;
   source: string;
   seen_at: number;
-  posted_date?: string; // fecha real de publicación (ISO, solo día) — LinkedIn no da hora
+  posted_date?: string;
 }
 
-const SOURCE_COLORS: Record<string, string> = {
-  OCC: "bg-blue-100 text-blue-700",
-  LinkedIn: "bg-sky-100 text-sky-700",
-  Computrabajo: "bg-orange-100 text-orange-700",
-  Bumeran: "bg-purple-100 text-purple-700",
-  Remotive: "bg-green-100 text-green-700",
-  WeWorkRemotely: "bg-teal-100 text-teal-700",
-  Himalayas: "bg-indigo-100 text-indigo-700",
-  Freelancer: "bg-amber-100 text-amber-700",
+const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
+  OCC: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  LinkedIn: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
+  Computrabajo: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  Bumeran: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
+  Remotive: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  WeWorkRemotely: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
+  Himalayas: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
+  Freelancer: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
 };
 
-// Freelancer.com es un marketplace sin fronteras — casi ninguna vacante
-// especifica país, así que el filtro de estados de México no aplica.
-// Se marca para que quede claro por qué aparece aunque no diga México.
 const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
 
 type OrdenKey = "fecha_desc" | "fecha_asc" | "empresa_asc" | "empresa_desc";
@@ -54,19 +64,13 @@ function timeAgo(timestamp: number): string {
   return `Hace ${Math.floor(diff / 86400)} días`;
 }
 
-function formatFechaHora(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString("es-MX", {
+function formatFechaPublicacion(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Mexico_City",
   });
 }
 
-// LinkedIn solo da la fecha de publicación con precisión de día, sin hora
-// (igual que muestran ellos mismos, ej. "hace 3 días").
 function diasDesdePublicacion(isoDate: string): number {
   const fecha = new Date(`${isoDate}T00:00:00`);
   const hoy = new Date();
@@ -75,23 +79,13 @@ function diasDesdePublicacion(isoDate: string): number {
   return Math.round((hoy.getTime() - fecha.getTime()) / 86400000);
 }
 
-function formatFechaPublicacion(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 function textoPublicacion(isoDate: string): string {
   const dias = diasDesdePublicacion(isoDate);
   if (dias <= 0) return "Publicada hoy";
   if (dias === 1) return "Publicada hace 1 día";
-  return `Publicada hace ${dias} días`;
+  return `Hace ${dias} días`;
 }
 
-// Fecha real de publicación cuando existe (LinkedIn, Freelancer.com); si
-// no, cuándo la encontró el scraper — mismo criterio que usa la API.
 function fechaParaOrdenar(v: Vacante): number {
   if (v.posted_date) {
     const ts = new Date(`${v.posted_date}T00:00:00Z`).getTime();
@@ -114,12 +108,10 @@ function ordenarVacantes(lista: Vacante[], orden: OrdenKey): Vacante[] {
   }
 }
 
-const SELECT_CLASSNAME =
-  "text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-[#2563EB] cursor-pointer";
-
 export default function VacantesPage() {
   const [vacantes, setVacantes] = useState<Vacante[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busqueda, setBusqueda] = useState("");
   const [ajustando, setAjustando] = useState<string | null>(null);
   const [cvAjustado, setCvAjustado] = useState<Record<string, string>>({});
   const [orden, setOrden] = useState<OrdenKey>("fecha_desc");
@@ -127,8 +119,11 @@ export default function VacantesPage() {
 
   useEffect(() => {
     fetch("/api/vacantes")
-      .then(r => r.json())
-      .then(data => { setVacantes(Array.isArray(data) ? data : []); setLoading(false); })
+      .then((r) => r.json())
+      .then((data) => {
+        setVacantes(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -146,22 +141,33 @@ export default function VacantesPage() {
       });
       const data = await res.json();
       if (data.cv) {
-        setCvAjustado(prev => ({ ...prev, [vacante.job_id]: data.cv }));
+        setCvAjustado((prev) => ({ ...prev, [vacante.job_id]: data.cv }));
       }
-    } catch { }
+    } catch {}
     setAjustando(null);
   }
 
-  // Grupos (cuando aplica): ordenados por cantidad de vacantes (más
-  // primero) y, dentro de cada uno, por el criterio de orden elegido.
+  // Filtrado por búsqueda en tiempo real
+  const vacantesFiltradas = useMemo(() => {
+    if (!busqueda.trim()) return vacantes;
+    const term = busqueda.toLowerCase();
+    return vacantes.filter(
+      (v) =>
+        v.title.toLowerCase().includes(term) ||
+        v.company.toLowerCase().includes(term) ||
+        v.location.toLowerCase().includes(term)
+    );
+  }, [vacantes, busqueda]);
+
+  // Grupos ordenados
   const grupos = useMemo(() => {
     if (agrupa === "ninguno") {
-      return [{ etiqueta: null as string | null, items: ordenarVacantes(vacantes, orden) }];
+      return [{ etiqueta: null as string | null, items: ordenarVacantes(vacantesFiltradas, orden) }];
     }
 
     const campo = agrupa === "fuente" ? "source" : "company";
     const porGrupo = new Map<string, Vacante[]>();
-    for (const v of vacantes) {
+    for (const v of vacantesFiltradas) {
       const clave = v[campo] || "Sin especificar";
       porGrupo.set(clave, [...(porGrupo.get(clave) ?? []), v]);
     }
@@ -169,90 +175,132 @@ export default function VacantesPage() {
     return Array.from(porGrupo.entries())
       .map(([etiqueta, items]) => ({ etiqueta, items: ordenarVacantes(items, orden) }))
       .sort((a, b) => b.items.length - a.items.length);
-  }, [vacantes, orden, agrupa]);
+  }, [vacantesFiltradas, orden, agrupa]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-[60vh]">
-      <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin" />
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+        <Loader2 className="w-9 h-9 text-[#2563EB] animate-spin" />
+        <p className="text-xs font-semibold text-slate-500">Cargando vacantes personalizadas...</p>
+      </div>
+    );
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="pb-4 border-b border-slate-200/60 space-y-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#0F2744] tracking-tight" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
-            Vacantes encontradas
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {vacantes.length > 0 ? `${vacantes.length} vacante${vacantes.length > 1 ? "s" : ""} que coinciden con tu perfil` : "Buscando vacantes para ti..."}
-          </p>
+    <div className="max-w-5xl mx-auto space-y-6 pb-16 px-4 sm:px-6">
+      {/* Header con Buscador y Controles */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-extrabold text-[#0F2744] tracking-tight">
+                Vacantes Coincidentes
+              </h1>
+              <span className="bg-blue-50 text-[#2563EB] text-xs font-bold px-2.5 py-0.5 rounded-full border border-blue-100">
+                {vacantesFiltradas.length}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Oportunidades encontradas automáticamente ajustadas a tu perfil.
+            </p>
+          </div>
+
+          {/* Buscador Rápido */}
+          <div className="relative w-full md:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar título, empresa o ciudad..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition-all placeholder:text-slate-400 font-medium"
+            />
+          </div>
         </div>
 
+        {/* Filtros de Ordenamiento y Agrupación */}
         {vacantes.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <label className="text-[11px] font-bold text-slate-500">Ordenar por</label>
-              <select
-                value={orden}
-                onChange={e => setOrden(e.target.value as OrdenKey)}
-                className={SELECT_CLASSNAME}
-              >
-                {OPCIONES_ORDEN.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
+            <div className="flex items-center gap-2 text-slate-500 font-medium">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filtros y organización</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <label className="text-[11px] font-bold text-slate-500">Agrupar por</label>
-              <select
-                value={agrupa}
-                onChange={e => setAgrupa(e.target.value as AgrupaKey)}
-                className={SELECT_CLASSNAME}
-              >
-                {OPCIONES_AGRUPA.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500">Ordenar:</label>
+                <select
+                  value={orden}
+                  onChange={(e) => setOrden(e.target.value as OrdenKey)}
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#2563EB] cursor-pointer"
+                >
+                  {OPCIONES_ORDEN.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500">Agrupar:</label>
+                <select
+                  value={agrupa}
+                  onChange={(e) => setAgrupa(e.target.value as AgrupaKey)}
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#2563EB] cursor-pointer"
+                >
+                  {OPCIONES_AGRUPA.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Sin vacantes */}
-      {vacantes.length === 0 && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-16 text-center shadow-xs">
-          <div className="text-5xl mb-4">🔍</div>
-          <h2 className="font-extrabold text-base text-[#0F2744] mb-2">Buscando vacantes para ti...</h2>
+      {/* Estado Vacío */}
+      {vacantesFiltradas.length === 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-xs space-y-3">
+          <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
+            🔍
+          </div>
+          <h2 className="font-extrabold text-slate-800 text-sm">No se encontraron vacantes</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Revisamos más de 7 portales cada 30 minutos. Las primeras vacantes aparecerán pronto.
+            {busqueda
+              ? "Prueba cambiando los términos de búsqueda o borrando los filtros aplicados."
+              : "Revisamos más de 7 portales continuamente. Las vacantes aparecerán pronto."}
           </p>
         </div>
       )}
 
-      {/* Lista de vacantes (agrupada o no) */}
+      {/* Listado de Vacantes */}
       {grupos.map((grupo) => (
-        <div key={grupo.etiqueta ?? "todas"} className="space-y-4">
+        <div key={grupo.etiqueta ?? "todas"} className="space-y-3">
           {grupo.etiqueta !== null && (
-            <div className="flex items-center gap-2 pt-2">
-              <h2 className="text-sm font-extrabold text-[#0F2744]">{grupo.etiqueta}</h2>
-              <span className="text-[11px] font-semibold text-slate-400">
-                {grupo.items.length} vacante{grupo.items.length !== 1 ? "s" : ""}
+            <div className="flex items-center gap-2 px-1 pt-2">
+              <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+              <h2 className="text-xs font-black text-[#0F2744] uppercase tracking-wider">
+                {grupo.etiqueta}
+              </h2>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                {grupo.items.length}
               </span>
             </div>
           )}
 
-          {grupo.items.map((vacante) => (
-            <VacanteCard
-              key={vacante.SK}
-              vacante={vacante}
-              ajustando={ajustando === vacante.job_id}
-              cvAjustado={cvAjustado[vacante.job_id]}
-              onAjustar={() => ajustarCV(vacante)}
-            />
-          ))}
+          <div className="space-y-3">
+            {grupo.items.map((vacante) => (
+              <VacanteCard
+                key={vacante.SK}
+                vacante={vacante}
+                ajustando={ajustando === vacante.job_id}
+                cvAjustado={cvAjustado[vacante.job_id]}
+                onAjustar={() => ajustarCV(vacante)}
+              />
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -270,79 +318,144 @@ function VacanteCard({
   cvAjustado?: string;
   onAjustar: () => void;
 }) {
+  const [copiado, setCopiado] = useState(false);
+  const configFuente = SOURCE_CONFIG[vacante.source] ?? {
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    border: "border-slate-200",
+  };
+
+  const copiarCV = () => {
+    if (!cvAjustado) return;
+    navigator.clipboard.writeText(cvAjustado);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
+
+  // Inicial de la empresa para el Avatar
+  const inicialEmpresa = vacante.company ? vacante.company.charAt(0).toUpperCase() : "B";
+
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs hover:shadow-sm transition-shadow">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          {/* Título y fuente */}
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SOURCE_COLORS[vacante.source] ?? "bg-slate-100 text-slate-600"}`}>
-              {vacante.source}
-            </span>
-            {FUENTES_INTERNACIONALES.has(vacante.source) && (
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500"
-                title="Marketplace sin fronteras — no filtra por estado de México"
-              >
-                Internacional
-              </span>
-            )}
-            <span className="text-[11px] text-slate-400">
-              {vacante.posted_date ? (
-                <>{textoPublicacion(vacante.posted_date)} · {formatFechaPublicacion(vacante.posted_date)}</>
-              ) : (
-                <>Encontrada {timeAgo(vacante.seen_at)} · {formatFechaHora(vacante.seen_at)}</>
-              )}
-            </span>
+    <div className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all group">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+        
+        {/* Lado Izquierdo: Logo + Info Principal */}
+        <div className="flex items-start gap-3.5 flex-1 min-w-0">
+          
+          {/* Avatar Icon / Logo Placeholder */}
+          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/70 flex items-center justify-center text-slate-700 font-extrabold text-sm flex-shrink-0 group-hover:border-blue-200 group-hover:bg-blue-50/50 transition-colors">
+            {inicialEmpresa}
           </div>
 
-          <h2 className="font-extrabold text-base text-[#0F2744] mb-1" style={{ fontFamily: "var(--font-plus-jakarta), sans-serif" }}>
-            {vacante.title}
-          </h2>
+          <div className="space-y-1.5 flex-1 min-w-0">
+            {/* Badges superiores */}
+            <div className="flex items-center gap-2 flex-wrap text-[11px]">
+              <span
+                className={`font-bold px-2.5 py-0.5 rounded-md border ${configFuente.bg} ${configFuente.text} ${configFuente.border}`}
+              >
+                {vacante.source}
+              </span>
 
-          <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
-            <span className="flex items-center gap-1">
-              <Building2 className="w-3.5 h-3.5" /> {vacante.company}
-            </span>
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5" /> {vacante.location}
-            </span>
+              {FUENTES_INTERNACIONALES.has(vacante.source) && (
+                <span className="font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                  Global
+                </span>
+              )}
+
+              <span className="text-slate-400 flex items-center gap-1 font-medium">
+                <Clock className="w-3 h-3" />
+                {vacante.posted_date ? (
+                  <>
+                    {textoPublicacion(vacante.posted_date)} ·{" "}
+                    {formatFechaPublicacion(vacante.posted_date)}
+                  </>
+                ) : (
+                  <>Detectada {timeAgo(vacante.seen_at)}</>
+                )}
+              </span>
+            </div>
+
+            {/* Título de la Vacante */}
+            <h2 className="font-bold text-base text-[#0F2744] group-hover:text-[#2563EB] transition-colors leading-snug truncate">
+              {vacante.title}
+            </h2>
+
+            {/* Empresa y Ubicación */}
+            <div className="flex items-center gap-3 text-xs text-slate-600 font-medium flex-wrap pt-0.5">
+              <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                {vacante.company}
+              </span>
+              <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                {vacante.location}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Botones */}
-        <div className="flex flex-col gap-2 flex-shrink-0">
+        {/* Lado Derecho: Acciones (Botones) */}
+        <div className="flex sm:flex-col items-center sm:items-end gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex-shrink-0">
+          <button
+            onClick={onAjustar}
+            disabled={ajustando}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-blue-200 disabled:opacity-60 cursor-pointer"
+          >
+            {ajustando ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Optimizando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                Ajustar mi CV
+              </>
+            )}
+          </button>
+
           <a
             href={vacante.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
           >
-            Ver vacante <ExternalLink className="w-3.5 h-3.5" />
+            Ver vacante
+            <ExternalLink className="w-3 h-3 text-slate-400" />
           </a>
-          <button
-            onClick={onAjustar}
-            disabled={ajustando}
-            className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:border-[#2563EB] text-slate-600 hover:text-[#2563EB] rounded-xl text-xs font-bold transition-all disabled:opacity-60 cursor-pointer"
-          >
-            {ajustando ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Ajustando...</>
-            ) : (
-              <><Sparkles className="w-3.5 h-3.5" /> Ajustar mi CV</>
-            )}
-          </button>
         </div>
       </div>
 
-      {/* CV ajustado */}
+      {/* Contenedor del CV Ajustado por IA */}
       {cvAjustado && (
-        <div className="mt-4 p-4 bg-blue-50/60 border border-blue-200/60 rounded-xl">
-          <p className="text-xs font-bold text-[#2563EB] mb-2 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> CV ajustado para esta vacante
-          </p>
-          <pre className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">
+        <div className="mt-4 p-4 bg-gradient-to-b from-blue-50/80 to-slate-50/50 border border-blue-200/80 rounded-xl space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB]">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>Sugerencia de adaptación de CV (IA)</span>
+            </div>
+
+            <button
+              onClick={copiarCV}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-blue-200 hover:border-blue-300 text-[#2563EB] text-[11px] font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
+            >
+              {copiado ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-600" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  Copiar texto
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="p-3 bg-white border border-slate-200/60 rounded-lg text-xs text-slate-700 font-sans leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
             {cvAjustado}
-          </pre>
+          </div>
         </div>
       )}
     </div>
