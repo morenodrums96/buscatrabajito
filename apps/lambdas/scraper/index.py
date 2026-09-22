@@ -227,6 +227,7 @@ def save_jobs_batch(jobs: list[dict]):
                     "source":      j["source"],
                     "posted_date": j.get("posted_date", ""),
                     "idioma":      j.get("idioma", ""),
+                    "tipo_empleo": j.get("tipo_empleo", ""),
                     "seen_at":     now_ts,
                 })
         print(f"[buscatrabajito-jobs] {len(jobs)} vacantes guardadas")
@@ -257,6 +258,51 @@ def job_id(title: str, company: str, location: str = "") -> str:
 
 def random_headers() -> dict:
     return random.choice(HEADERS_POOL)
+
+
+def extraer_json_embebido(texto: str, marcador: str) -> dict | None:
+    """Algunos sitios (ej. Talenteca) no traen una API JSON aparte, pero sí
+    incrustan el estado inicial de la página como `window.ALGO = {...}` en
+    un <script>. Esto ubica el marcador y balancea llaves (respetando
+    strings) para extraer y parsear ese objeto, sin asumir que termina en
+    un punto fijo del HTML."""
+    start = texto.find(marcador)
+    if start == -1:
+        return None
+    start_json = texto.find("{", start)
+    if start_json == -1:
+        return None
+
+    depth = 0
+    end = None
+    in_str = False
+    esc = False
+    for i in range(start_json, len(texto)):
+        c = texto[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    if end is None:
+        return None
+    try:
+        return json.loads(texto[start_json:end])
+    except json.JSONDecodeError:
+        return None
 
 
 def keywords_from_terms(terms: list[str]) -> list[str]:
@@ -490,6 +536,81 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
     return jobs
 
 
+WORKHOURS_A_TIPO_EMPLEO = {
+    "tiempo completo": "Tiempo completo",
+    "tiempo parcial": "Medio tiempo",
+    "prácticas / becario / pasantía": "Prácticas / Becario",
+    "por proyecto": "Freelance / Proyecto",
+}
+
+
+def scrape_talenteca(terms: list[str]) -> list[dict]:
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    MAX_PAGES = 2  # 20 resultados por página, ya es buen volumen por término
+    for term in terms:
+        for page in range(1, MAX_PAGES + 1):
+            url = (
+                "https://www.talenteca.com/empleos"
+                f"?q={requests.utils.quote(term)}&page={page}"
+            )
+            r = safe_get(url)
+            if not r:
+                break
+            try:
+                data = extraer_json_embebido(
+                    r.text, "window._tk_tamarin_job_ad_search_initial_payload = "
+                )
+                resultados_wrap = (data or {}).get("payload", {}).get("search_response", {}).get("job_ads_results", {})
+                resultados = resultados_wrap.get("results", [])
+            except Exception as e:
+                print(f"  Talenteca parse error [{term}] pág {page}: {e}")
+                break
+
+            if not resultados:
+                break
+
+            for item in resultados:
+                try:
+                    title   = item.get("title", "")
+                    company = item.get("company_name") or "N/A"
+                    city, region = item.get("city", ""), item.get("region", "")
+                    location = f"{city}, {region}" if city and region else (region or city or "México")
+                    link = item.get("job_ad_url", "")
+
+                    ts = item.get("published_at")
+                    posted_date = (
+                        datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+                        if ts else ""
+                    )
+
+                    # Talenteca sí da el tipo de empleo explícito (a
+                    # diferencia de las demás fuentes, donde hay que
+                    # adivinarlo del título) — se usa cuando mapea a
+                    # nuestro vocabulario.
+                    tipo_empleo = ""
+                    for w in (item.get("workhours") or []):
+                        tipo_empleo = WORKHOURS_A_TIPO_EMPLEO.get(w.lower(), "")
+                        if tipo_empleo:
+                            break
+
+                    if title and is_relevant(title, location, keywords):
+                        jobs.append({
+                            "source": "Talenteca", "title": title, "company": company,
+                            "location": location, "link": link, "posted_date": posted_date,
+                            "tipo_empleo": tipo_empleo,
+                            "job_id": job_id(title, company, location),
+                        })
+                except Exception as e:
+                    print(f"  Talenteca item error: {e}")
+
+            total_pages = resultados_wrap.get("total_pages", 1)
+            if page >= total_pages:
+                break
+    print(f"Talenteca: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 def scrape_bumeran(terms: list[str]) -> list[dict]:
     jobs     = []
     keywords = keywords_from_terms(terms)
@@ -688,6 +809,7 @@ def main(event=None, context=None):
         ("Freelancer", lambda: scrape_freelancer(terms)),
         ("OCC", lambda: scrape_occ(terms)),
         ("Computrabajo", lambda: scrape_computrabajo(terms)),
+        ("Talenteca", lambda: scrape_talenteca(terms)),
     ]
 
     all_jobs = []

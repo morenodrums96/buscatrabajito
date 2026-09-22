@@ -98,9 +98,14 @@ function coincideConPreferencias(
   }
 
   if (tiposTrabajoDeseados.length > 0) {
-    // Freelancer.com es 100% trabajo freelance por definición.
+    // Freelancer.com es 100% trabajo freelance por definición, y
+    // Talenteca reporta el tipo real (job.tipo_empleo) — ninguna de las
+    // dos depende de adivinar por el título.
+    const tipoEmpleoGuardado = String(job.tipo_empleo ?? "");
     const tipoJob =
-      job.source === "Freelancer" ? "Freelance / Proyecto" : detectarTipoEmpleo(String(job.title ?? ""));
+      job.source === "Freelancer"
+        ? "Freelance / Proyecto"
+        : tipoEmpleoGuardado || detectarTipoEmpleo(String(job.title ?? ""));
     if (!tiposTrabajoDeseados.includes(tipoJob)) {
       return false;
     }

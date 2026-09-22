@@ -118,9 +118,13 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     # Prácticas). Mismo criterio: sin selección, no filtra.
     tipos_deseados = profile.get("tiposTrabajo") or []
     if tipos_deseados:
-        # Freelancer.com es 100% trabajo freelance por definición — no
-        # depende de que el título lo diga explícitamente.
-        tipo_job = "Freelance / Proyecto" if job.get("source") == "Freelancer" else detectar_tipo_empleo(job.get("title", ""))
+        # Freelancer.com es 100% trabajo freelance por definición, y
+        # Talenteca reporta el tipo real (job["tipo_empleo"]) — ninguna de
+        # las dos depende de adivinar por el título.
+        if job.get("source") == "Freelancer":
+            tipo_job = "Freelance / Proyecto"
+        else:
+            tipo_job = job.get("tipo_empleo") or detectar_tipo_empleo(job.get("title", ""))
         if tipo_job not in tipos_deseados:
             print(f"  NO MATCH (tipo de empleo detectado={tipo_job}, deseado={tipos_deseados})")
             return False
@@ -245,6 +249,7 @@ def save_match(user_id: str, job: dict):
         "source": job["source"],
         "posted_date": job.get("posted_date", ""),
         "idioma": job.get("idioma", ""),
+        "tipo_empleo": job.get("tipo_empleo", ""),
         "seen_at": now,
         "notified": False,
     })

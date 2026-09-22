@@ -38,6 +38,7 @@ const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }
   WeWorkRemotely: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
   Himalayas: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
   Freelancer: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
+  Talenteca: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
 };
 
 const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
