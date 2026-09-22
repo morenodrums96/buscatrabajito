@@ -14,6 +14,7 @@ import {
   Clock,
   Briefcase,
   Filter,
+  Globe,
 } from "lucide-react";
 
 interface Vacante {
@@ -86,6 +87,14 @@ function textoPublicacion(isoDate: string): string {
   return `Hace ${dias} días`;
 }
 
+// Mismo criterio que ya usa matching.py/api/vacantes: sin un campo
+// explícito de modalidad por vacante, se detecta por palabras clave en
+// location o título (las fuentes 100% remotas guardan location="Remoto").
+function esRemota(v: Vacante): boolean {
+  const texto = `${v.location} ${v.title}`.toLowerCase();
+  return ["remoto", "remote", "anywhere"].some((w) => texto.includes(w));
+}
+
 function fechaParaOrdenar(v: Vacante): number {
   if (v.posted_date) {
     const ts = new Date(`${v.posted_date}T00:00:00Z`).getTime();
@@ -116,6 +125,7 @@ export default function VacantesPage() {
   const [cvAjustado, setCvAjustado] = useState<Record<string, string>>({});
   const [orden, setOrden] = useState<OrdenKey>("fecha_desc");
   const [agrupa, setAgrupa] = useState<AgrupaKey>("ninguno");
+  const [soloRemoto, setSoloRemoto] = useState(false);
 
   useEffect(() => {
     fetch("/api/vacantes")
@@ -147,17 +157,19 @@ export default function VacantesPage() {
     setAjustando(null);
   }
 
-  // Filtrado por búsqueda en tiempo real
+  // Filtrado por búsqueda y "solo remoto" en tiempo real
   const vacantesFiltradas = useMemo(() => {
-    if (!busqueda.trim()) return vacantes;
-    const term = busqueda.toLowerCase();
-    return vacantes.filter(
-      (v) =>
+    const term = busqueda.trim().toLowerCase();
+    return vacantes.filter((v) => {
+      if (soloRemoto && !esRemota(v)) return false;
+      if (!term) return true;
+      return (
         v.title.toLowerCase().includes(term) ||
         v.company.toLowerCase().includes(term) ||
         v.location.toLowerCase().includes(term)
-    );
-  }, [vacantes, busqueda]);
+      );
+    });
+  }, [vacantes, busqueda, soloRemoto]);
 
   // Grupos ordenados
   const grupos = useMemo(() => {
@@ -226,6 +238,19 @@ export default function VacantesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSoloRemoto((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer ${
+                  soloRemoto
+                    ? "bg-blue-50 text-[#2563EB] border-blue-200"
+                    : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Solo remoto
+              </button>
+
               <div className="flex items-center gap-1.5">
                 <label className="text-[11px] font-bold text-slate-500">Ordenar:</label>
                 <select
@@ -268,8 +293,8 @@ export default function VacantesPage() {
           </div>
           <h2 className="font-extrabold text-slate-800 text-sm">No se encontraron vacantes</h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            {busqueda
-              ? "Prueba cambiando los términos de búsqueda o borrando los filtros aplicados."
+            {busqueda || soloRemoto
+              ? "Prueba cambiando los términos de búsqueda o quitando el filtro de \"Solo remoto\"."
               : "Revisamos más de 7 portales continuamente. Las vacantes aparecerán pronto."}
           </p>
         </div>
