@@ -83,7 +83,6 @@ function coincideConPreferencias(
 ) {
   const location = String(job.location ?? "").toLowerCase();
   const title = String(job.title ?? "").toLowerCase();
-  const locationPlain = stripAccents(location);
 
   if (idiomasDeseados.length > 0) {
     const codigosDeseados = idiomasDeseados
@@ -131,29 +130,25 @@ function coincideConPreferencias(
     return true;
   }
 
-  // El location normalmente viene como "Ciudad, Estado, País". Varios
-  // municipios se llaman igual en distintos estados (ej. "Juárez" existe
-  // en Nuevo León Y en Chihuahua) — comparar contra el string completo
-  // genera falsos positivos. Si hay 3+ partes, el segmento de estado
-  // (penúltimo, antes del país) manda por sí solo. Si no (ej. "Nuevo
-  // León, México" sin ciudad, o "Remoto"), se cae a comparar el estado
-  // contra el string completo (sin municipios, para no arriesgar).
+  // El location viene como "Ciudad, Estado, País" (LinkedIn, ej.
+  // "Monterrey, Nuevo León, México") o "Ciudad, Estado" sin país
+  // (OCC/Computrabajo, ej. "Benito Juárez, Ciudad de México"). El
+  // segmento de estado manda por sí solo, nunca se compara contra el
+  // string completo (evita falsos positivos tipo municipios con nombre
+  // repetido entre estados): es el penúltimo segmento si el último es
+  // literalmente "México" (el país), o si no, el último segmento tal cual.
   const partes = location.split(",").map((p) => p.trim());
-  const estadoEnLocationPlain = partes.length >= 3 ? stripAccents(partes[partes.length - 2]) : null;
+  const ultimo = partes.length > 0 ? stripAccents(partes[partes.length - 1]) : "";
+  const estadoEnLocationPlain =
+    partes.length >= 2 && ultimo === "mexico" ? stripAccents(partes[partes.length - 2]) : ultimo;
 
   return estadosDeseados.some((estado) => {
     const estadoPlain = stripAccents(estado.toLowerCase());
-
-    let coincide: boolean;
-    if (estadoEnLocationPlain !== null) {
-      const alias = ALIAS_ESTADO[estadoPlain] ?? [];
-      coincide =
-        estadoPlain === estadoEnLocationPlain ||
-        estadoEnLocationPlain.includes(estadoPlain) ||
-        alias.includes(estadoEnLocationPlain);
-    } else {
-      coincide = locationPlain.includes(estadoPlain);
-    }
+    const alias = ALIAS_ESTADO[estadoPlain] ?? [];
+    const coincide =
+      estadoPlain === estadoEnLocationPlain ||
+      estadoEnLocationPlain.includes(estadoPlain) ||
+      alias.includes(estadoEnLocationPlain);
 
     if (!coincide) return false;
 
