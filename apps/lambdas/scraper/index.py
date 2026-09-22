@@ -82,6 +82,51 @@ def slugify(text: str) -> str:
     return text
 
 
+MESES_ES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+    "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+
+
+def parse_fecha_relativa(texto: str) -> str:
+    """OCC y Computrabajo no dan la fecha real en un atributo aparte (a
+    diferencia de LinkedIn) — la muestran como texto relativo en español
+    ("Hace 6 días", "Hoy", "Ayer", "9 de septiembre", "Más de 30 días").
+    Esto lo convierte a fecha ISO (solo día, igual que LinkedIn) usando
+    la fecha actual como referencia. Devuelve "" si no reconoce el
+    formato — mejor no guardar posted_date que guardar uno incorrecto.
+    """
+    t = unicodedata.normalize("NFKD", texto.lower().strip()).encode("ascii", "ignore").decode()
+    t = re.sub(r"\s+", " ", t)
+    hoy = datetime.now(timezone.utc)
+
+    if t == "hoy":
+        return hoy.strftime("%Y-%m-%d")
+    if t == "ayer":
+        return (hoy - timedelta(days=1)).strftime("%Y-%m-%d")
+    if "mas de 30 dias" in t:
+        return (hoy - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    m = re.match(r"hace (\d+) (minuto|hora|dia|semana|mes)", t)
+    if m:
+        n, unidad = int(m.group(1)), m.group(2)
+        dias = {"minuto": 0, "hora": 0, "dia": n, "semana": n * 7, "mes": n * 30}[unidad]
+        return (hoy - timedelta(days=dias)).strftime("%Y-%m-%d")
+
+    m = re.match(r"(\d+) de (\w+)", t)
+    if m and m.group(2) in MESES_ES:
+        dia, mes = int(m.group(1)), MESES_ES[m.group(2)]
+        try:
+            fecha = datetime(hoy.year, mes, dia, tzinfo=timezone.utc)
+        except ValueError:
+            return ""
+        if fecha > hoy:
+            fecha = fecha.replace(year=hoy.year - 1)
+        return fecha.strftime("%Y-%m-%d")
+
+    return ""
+
+
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
     dynamodb = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     table = dynamodb.Table(USERS_TABLE)
@@ -312,9 +357,13 @@ def scrape_occ(terms: list[str]) -> list[dict]:
                     # nada, aunque le falte el slug bonito.
                     link = id_a_url.get(oferta_id, f"https://www.occ.com.mx/empleo/oferta/{oferta_id}")
 
+                    fecha_el = card.select_one("span.mr-2.text-sm.font-light")
+                    posted_date = parse_fecha_relativa(fecha_el.get_text(strip=True)) if fecha_el else ""
+
                     if is_relevant(title, location, keywords):
                         jobs.append({"source": "OCC", "title": title, "company": company,
-                                     "location": location, "link": link, "job_id": job_id(title, company, location)})
+                                     "location": location, "link": link, "posted_date": posted_date,
+                                     "job_id": job_id(title, company, location)})
                 except Exception as e:
                     print(f"  OCC card error: {e}")
         except Exception as e:
@@ -428,9 +477,13 @@ def scrape_computrabajo(terms: list[str]) -> list[dict]:
                 company  = re.sub(r"^\d+(\.\d+)?\s+", "", company).strip() or "N/A"
                 location = parrafos[1].get_text(" ", strip=True) if len(parrafos) > 1 else "México"
 
+                fecha_el = card.select_one("p.fs13.fc_aux.mt15")
+                posted_date = parse_fecha_relativa(fecha_el.get_text(strip=True)) if fecha_el else ""
+
                 if is_relevant(title, location, keywords):
                     jobs.append({"source": "Computrabajo", "title": title, "company": company,
-                                 "location": location, "link": link, "job_id": job_id(title, company, location)})
+                                 "location": location, "link": link, "posted_date": posted_date,
+                                 "job_id": job_id(title, company, location)})
             except Exception as e:
                 print(f"  Computrabajo card error: {e}")
     print(f"Computrabajo: {len(jobs)} vacantes encontradas")
