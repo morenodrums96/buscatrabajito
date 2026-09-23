@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { sileo } from "sileo";
 import CVWizard, { CVData } from "@/components/CVWizard";
 import CVCompletionOverlay from "@/components/CVCompletionOverlay";
+import EmailAutocompleteInput from "@/components/EmailAutocompleteInput";
 import {
   Upload,
   RefreshCw,
@@ -1356,6 +1357,28 @@ export default function CVPage() {
                               "
                             />
                           </div>
+                        ) : f.field === "email" ? (
+                          <EmailAutocompleteInput
+                            value={(cvData.email as string) ?? ""}
+                            onChange={value =>
+                              updateField("email", value)
+                            }
+                            className="
+                              w-full
+                              px-3
+                              py-2
+                              bg-slate-50/50
+                              border
+                              border-slate-200
+                              rounded-xl
+                              text-xs
+                              text-[#0F2744]
+                              focus:bg-white
+                              focus:border-[#2563EB]
+                              outline-none
+                              transition-all
+                            "
+                          />
                         ) : (
                           <input
                             type="text"

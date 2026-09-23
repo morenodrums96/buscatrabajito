@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
+import EmailAutocompleteInput from "@/components/EmailAutocompleteInput";
 import {
   ArrowLeft,
   ArrowRight,
@@ -1178,12 +1179,11 @@ export default function AIProfileBuilder({
                   Correo electrónico *
                 </label>
 
-                <input
+                <EmailAutocompleteInput
                   autoFocus
-                  type="email"
                   value={data.email}
-                  onChange={(e) =>
-                    updateData("email", e.target.value)
+                  onChange={(value) =>
+                    updateData("email", value)
                   }
                   onKeyDown={(e) => {
                     if (e.key === "Enter") nextQuestion();
