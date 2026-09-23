@@ -8,14 +8,39 @@ import {
   Sparkles,
   Loader2,
   Search,
-  Check,
-  Copy,
+  Download,
   Calendar,
   Clock,
   Briefcase,
   Filter,
   Globe,
 } from "lucide-react";
+
+interface CVAjustadoIdioma {
+  resumen: string;
+  tituloProfesional: string;
+  pdfBase64: string;
+}
+
+interface CVAjustadoResultado {
+  es: CVAjustadoIdioma;
+  en: CVAjustadoIdioma;
+}
+
+function descargarPdfBase64(base64: string, filename: string) {
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 interface Vacante {
   SK: string;
@@ -123,7 +148,7 @@ export default function VacantesPage() {
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [ajustando, setAjustando] = useState<string | null>(null);
-  const [cvAjustado, setCvAjustado] = useState<Record<string, string>>({});
+  const [cvAjustado, setCvAjustado] = useState<Record<string, CVAjustadoResultado>>({});
   const [orden, setOrden] = useState<OrdenKey>("fecha_desc");
   const [agrupa, setAgrupa] = useState<AgrupaKey>("ninguno");
   const [soloRemoto, setSoloRemoto] = useState(false);
@@ -151,8 +176,8 @@ export default function VacantesPage() {
         }),
       });
       const data = await res.json();
-      if (data.cv) {
-        setCvAjustado((prev) => ({ ...prev, [vacante.job_id]: data.cv }));
+      if (data.es && data.en) {
+        setCvAjustado((prev) => ({ ...prev, [vacante.job_id]: data as CVAjustadoResultado }));
       }
     } catch {}
     setAjustando(null);
@@ -343,21 +368,13 @@ function VacanteCard({
 }: {
   vacante: Vacante;
   ajustando: boolean;
-  cvAjustado?: string;
+  cvAjustado?: CVAjustadoResultado;
   onAjustar: () => void;
 }) {
-  const [copiado, setCopiado] = useState(false);
   const configFuente = SOURCE_CONFIG[vacante.source] ?? {
     bg: "bg-slate-100",
     text: "text-slate-700",
     border: "border-slate-200",
-  };
-
-  const copiarCV = () => {
-    if (!cvAjustado) return;
-    navigator.clipboard.writeText(cvAjustado);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
   };
 
   // Inicial de la empresa para el Avatar
@@ -457,32 +474,33 @@ function VacanteCard({
       {/* Contenedor del CV Ajustado por IA */}
       {cvAjustado && (
         <div className="mt-4 p-4 bg-gradient-to-b from-blue-50/80 to-slate-50/50 border border-blue-200/80 rounded-xl space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB]">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span>Sugerencia de adaptación de CV (IA)</span>
-            </div>
-
-            <button
-              onClick={copiarCV}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-blue-200 hover:border-blue-300 text-[#2563EB] text-[11px] font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
-            >
-              {copiado ? (
-                <>
-                  <Check className="w-3 h-3 text-emerald-600" />
-                  Copiado
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  Copiar texto
-                </>
-              )}
-            </button>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB]">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span>CV adaptado para esta vacante (IA) — español e inglés</span>
           </div>
 
-          <div className="p-3 bg-white border border-slate-200/60 rounded-lg text-xs text-slate-700 font-sans leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
-            {cvAjustado}
+          <p className="text-xs text-slate-600 leading-relaxed">{cvAjustado.es.resumen}</p>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() =>
+                descargarPdfBase64(cvAjustado.es.pdfBase64, `CV ${vacante.company} - Español.pdf`)
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Descargar CV en Español (PDF)
+            </button>
+
+            <button
+              onClick={() =>
+                descargarPdfBase64(cvAjustado.en.pdfBase64, `CV ${vacante.company} - English.pdf`)
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-blue-200 text-[#2563EB] text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download CV in English (PDF)
+            </button>
           </div>
         </div>
       )}
