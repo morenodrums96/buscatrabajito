@@ -30,14 +30,15 @@ async function normalizarTerminosBusqueda(puesto: string): Promise<string[]> {
       messages: [
         {
           role: "system",
-          content: `Eres un experto en nomenclatura de puestos de trabajo, en español e inglés. Dado un puesto de trabajo (a veces escrito de forma larga, con modificadores como "freelance", "proyecto" o tecnologías entre paréntesis), devuelve una lista corta (3 a 6) de términos de búsqueda equivalentes, EN INGLÉS Y ESPAÑOL, que se usarían para encontrar ese tipo de vacante en portales de empleo bilingües (LinkedIn, Indeed, Computrabajo, OCC, Bumeran, etc.). Cada término debe ser un título de puesto real y buscable por sí solo — nunca un calificador suelto como "freelance", "proyecto", "player-coach" o similares. No inventes tecnologías o seniority que no estén en el puesto original. Responde SOLO con JSON en este formato: {"terminos": ["termino1", "termino2", ...]}.
+          content: `Eres un experto en nomenclatura de puestos de trabajo, en español e inglés, de TODAS las industrias (no solo tecnología — manufactura, salud, ventas, ingeniería industrial, etc.). Dado un puesto de trabajo (a veces escrito de forma larga, con modificadores como "freelance", "proyecto" o tecnologías entre paréntesis), devuelve una lista corta (3 a 6) de términos de búsqueda equivalentes, EN INGLÉS Y ESPAÑOL, que se usarían para encontrar ese tipo de vacante en portales de empleo bilingües (LinkedIn, Indeed, Computrabajo, OCC, Bumeran, etc.). Cada término debe ser un título de puesto real y buscable por sí solo — nunca un calificador suelto como "freelance", "proyecto", "player-coach" o similares. No inventes tecnologías, industria o seniority que no estén en el puesto original — si el puesto es genérico (ej. "Líder de Ingeniería" o "Gerente de Producción" sin más contexto), NO asumas que es de software/tecnología a menos que el puesto lo diga explícitamente ("Líder Técnico de Software", "Ingeniero de Software", etc.); usa variantes igual de genéricas, sin inclinarte hacia ninguna industria en particular. Responde SOLO con JSON en este formato: {"terminos": ["termino1", "termino2", ...]}.
 
 Ejemplos:
-"Liderazgo Técnico" -> {"terminos": ["Tech Lead", "Technical Lead", "Engineering Manager", "Team Lead", "Líder Técnico"]}
+"Líder de Ingeniería" -> {"terminos": ["Engineering Lead", "Engineering Manager", "Líder de Ingeniería", "Jefe de Ingeniería"]}
 "Arquitectura de Software" -> {"terminos": ["Software Architect", "Solutions Architect", "Enterprise Architect", "Arquitecto de Software"]}
 "Engineering Lead / Backend (Node.js) - Proyecto freelance" -> {"terminos": ["Engineering Lead", "Backend Engineer", "Tech Lead", "Node.js Engineer", "Ingeniero Backend"]}
-"Data Analyst" -> {"terminos": ["Data Analyst", "Business Intelligence Analyst", "Analytics Analyst", "Analista de Datos"]}
-"Analista de Datos" -> {"terminos": ["Data Analyst", "Business Intelligence Analyst", "Data Specialist", "Analista de Datos"]}`,
+"Gerente de Producción" -> {"terminos": ["Production Manager", "Manufacturing Manager", "Gerente de Producción", "Jefe de Producción"]}
+"Ingeniero Mecatrónico" -> {"terminos": ["Mechatronics Engineer", "Automation Engineer", "Controls Engineer", "Ingeniero en Mecatrónica"]}
+"Data Analyst" -> {"terminos": ["Data Analyst", "Business Intelligence Analyst", "Analytics Analyst", "Analista de Datos"]}`,
         },
         { role: "user", content: puesto },
       ],
