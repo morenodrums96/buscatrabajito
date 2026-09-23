@@ -135,6 +135,17 @@ function coincideConPreferencias(
     return true;
   }
 
+  // Si location es genérico "México" sin ciudad/estado (pasa seguido con
+  // LinkedIn), no hay forma de saber en qué estado específico está — se
+  // deja pasar si el usuario acepta remoto en al menos uno de sus
+  // estados (podría ser remota), igual que decide matching.py para esta
+  // misma vacante. Sin este mismo criterio aquí, una vacante que SÍ
+  // generó el correo de alerta podía no aparecer en /dashboard/vacantes.
+  const GENERIC_LOCATIONS = new Set(["mexico", "mexico, mexico"]);
+  if (GENERIC_LOCATIONS.has(stripAccents(location.trim()))) {
+    return quiereRemoto;
+  }
+
   // El location viene como "Ciudad, Estado, País" (LinkedIn, ej.
   // "Monterrey, Nuevo León, México") o "Ciudad, Estado" sin país
   // (OCC/Computrabajo, ej. "Benito Juárez, Ciudad de México"). El
