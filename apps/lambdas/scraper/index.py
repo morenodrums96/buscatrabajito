@@ -1,7 +1,8 @@
 """
 BuscoTrabajito — Scraper de vacantes multi-usuario
 Fuentes activas: OCC Mundial, LinkedIn Jobs, Computrabajo, Talenteca,
-                  Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX, Ternium
+                  Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX, Ternium,
+                  Grupo Modelo
 Definidas pero inactivas (no están en la lista `scrapers` de main()):
                   Bumeran, Remotive, We Work Remotely, Himalayas
 
@@ -218,6 +219,27 @@ def normalizar_location_ternium(ciudad: str, country: str) -> str:
     # exactamente "México", cae en el mismo caso "location genérico" que
     # ya manejan matching.py y route.ts.
     return ciudad.strip()
+
+
+def parse_fecha_workday(texto: str) -> str:
+    """Workday da la fecha como texto relativo, localizado según el
+    Accept-Language de la request — con nuestros headers (es-MX) viene
+    en español ("Publicado hoy", "Publicado ayer", "Publicado hace 5
+    días", "Publicado hace más de 30 días"), pero se deja también el
+    patrón en inglés por si algún tenant no lo localiza."""
+    t = unicodedata.normalize("NFKD", texto.lower().strip()).encode("ascii", "ignore").decode()
+    hoy = datetime.now(timezone.utc)
+    if "hoy" in t or "today" in t:
+        return hoy.strftime("%Y-%m-%d")
+    if "ayer" in t or "yesterday" in t:
+        return (hoy - timedelta(days=1)).strftime("%Y-%m-%d")
+    if "mas de 30" in t or "30+" in t:
+        return (hoy - timedelta(days=30)).strftime("%Y-%m-%d")
+    m = re.search(r"(\d+)\s+dias?|(\d+)\s+days?", t)
+    if m:
+        dias = int(m.group(1) or m.group(2))
+        return (hoy - timedelta(days=dias)).strftime("%Y-%m-%d")
+    return ""
 
 
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
@@ -1047,6 +1069,67 @@ def scrape_ternium(terms: list[str]) -> list[dict]:
     return jobs
 
 
+def scrape_workday(terms: list[str], source_name: str, wd_host: str, tenant: str, site: str) -> list[dict]:
+    """Workday es una de las plataformas de ATS más comunes entre
+    multinacionales (Grupo Modelo/AB InBev la usa, y muchas otras
+    también) — API pública de búsqueda (Candidate Experience / CxS) en
+    POST {wd_host}/wday/cxs/{tenant}/{site}/jobs, sin sesión ni token.
+    Genérica a propósito para poder sumar más empresas con solo pasar
+    su tenant/site, igual que se hizo con scrape_eightfold.
+
+    La ubicación (ej. "MEX - CD - LCM Occidente, Guadalajara") se deja
+    tal cual — el matching por estado ya solo mira el ÚLTIMO segmento
+    después de la coma, así que el prefijo interno de la empresa no
+    afecta y no hace falta normalizarla aparte.
+    """
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    api_url   = f"https://{wd_host}/wday/cxs/{tenant}/{site}/jobs"
+    site_url  = f"https://{wd_host}/es/recruiting/{tenant}/{site}"
+    RESULTS_PER_PAGE = 20
+    MAX_PAGES = 2
+    for term in terms:
+        for page in range(MAX_PAGES):
+            offset  = page * RESULTS_PER_PAGE
+            payload = json.dumps({
+                "appliedFacets": {}, "limit": RESULTS_PER_PAGE, "offset": offset, "searchText": term,
+            })
+            try:
+                time.sleep(random.uniform(1.0, 2.0))
+                headers = random_headers()
+                headers["Content-Type"] = "application/json"
+                r = requests.post(api_url, data=payload, headers=headers, timeout=15)
+                if r.status_code != 200:
+                    print(f"  {source_name} API {r.status_code}: {term}")
+                    break
+                data = r.json()
+            except Exception as e:
+                print(f"  {source_name} error [{term}] pág {page}: {e}")
+                break
+
+            postings = data.get("jobPostings", [])
+            if not postings:
+                break
+
+            for p in postings:
+                try:
+                    title    = p.get("title", "")
+                    location = p.get("locationsText") or "México"
+                    link     = site_url + p.get("externalPath", "")
+                    posted_date = parse_fecha_workday(p.get("postedOn", ""))
+                    if title and is_relevant(title, location, keywords):
+                        jobs.append({"source": source_name, "title": title, "company": source_name,
+                                     "location": location, "link": link, "posted_date": posted_date,
+                                     "job_id": job_id(title, source_name, location)})
+                except Exception as e:
+                    print(f"  {source_name} item error: {e}")
+
+            if data.get("total", 0) <= offset + RESULTS_PER_PAGE:
+                break
+    print(f"{source_name}: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
     new_jobs        = []
@@ -1080,6 +1163,7 @@ def main(event=None, context=None):
         ("Coca-Cola FEMSA", lambda: scrape_eightfold(terms, "Coca-Cola FEMSA", "coca-colafemsa.eightfold.ai", "coca-colafemsa.com")),
         ("CEMEX", lambda: scrape_cemex(terms)),
         ("Ternium", lambda: scrape_ternium(terms)),
+        ("Grupo Modelo", lambda: scrape_workday(terms, "Grupo Modelo", "wd1.myworkdaysite.com", "abinbev", "MEX")),
     ]
 
     all_jobs = []
