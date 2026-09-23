@@ -578,6 +578,33 @@ export default function CVPage() {
      */
     setSaving(true);
 
+    // El wizard ya recolectó puestos/estados/modalidad — hay que crear los
+    // PROFILE# reales aquí mismo (no mandar perfiles: [] como antes), o si
+    // el usuario nunca vuelve a esta pantalla a darle "Guardar Cambios" por
+    // separado, el scraper/matching nunca tienen nada que buscarle y no le
+    // llega ninguna vacante aunque el CV se haya guardado bien.
+    const perfilesIniciales = (data.puestosDeseados ?? []).map((puesto, i) => ({
+      puesto,
+      prioridad: i + 1,
+      estados: data.estadosDeseados ?? [],
+      remotoUSA,
+      modalidades: data.modalidadDeseada ?? [],
+      modalidadPorEstado: data.modalidadPorEstado ?? {},
+      tiposTrabajo: data.tipoJornada ?? [],
+      idiomasVacantes: data.idiomasVacantes ?? [],
+      nivelProfesional,
+      salarioMinimo: nuevoSalarioMin ? parseInt(nuevoSalarioMin) : null,
+      aceptaNivelInferior,
+    }));
+
+    setPerfiles(
+      (data.puestosDeseados ?? []).map((puesto, i) => ({
+        puesto,
+        activo: true,
+        prioridad: i + 1,
+      }))
+    );
+
     fetch("/api/cv/guardar", {
       method: "POST",
       headers: {
@@ -585,7 +612,7 @@ export default function CVPage() {
       },
       body: JSON.stringify({
         cvData: data,
-        perfiles: [],
+        perfiles: perfilesIniciales,
       }),
     }).finally(() => {
       setSaving(false);
