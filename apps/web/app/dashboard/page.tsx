@@ -13,6 +13,8 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
+  MapPin,
+  Building2,
 } from "lucide-react";
 import { useDashboard } from "@/components/dashboard/DashboardContext";
 
@@ -21,6 +23,18 @@ interface Perfil {
   estados: string[];
   modalidades: string[];
 }
+
+interface Vacante {
+  job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  link: string;
+  source: string;
+  seen_at: number;
+}
+
+const UNA_SEMANA_SEGUNDOS = 7 * 24 * 60 * 60;
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -35,6 +49,9 @@ export default function Dashboard() {
   );
   const [perfiles, setPerfiles] = useState<Perfil[]>([]);
   const [loadingPerfiles, setLoadingPerfiles] = useState(true);
+  const [vacantes, setVacantes] = useState<Vacante[]>([]);
+  const [loadingVacantes, setLoadingVacantes] = useState(true);
+  const [vacantesEstaSemana, setVacantesEstaSemana] = useState(0);
 
   useEffect(() => {
     fetch("/api/perfiles")
@@ -44,6 +61,17 @@ export default function Dashboard() {
         setLoadingPerfiles(false);
       })
       .catch(() => setLoadingPerfiles(false));
+
+    fetch("/api/vacantes")
+      .then((r) => r.json())
+      .then((data) => {
+        const items: Vacante[] = Array.isArray(data) ? data : [];
+        setVacantes(items);
+        const ahora = Date.now() / 1000;
+        setVacantesEstaSemana(items.filter((v) => ahora - v.seen_at < UNA_SEMANA_SEGUNDOS).length);
+        setLoadingVacantes(false);
+      })
+      .catch(() => setLoadingVacantes(false));
   }, []);
 
   return (
@@ -96,9 +124,9 @@ export default function Dashboard() {
       {/* Métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Vacantes encontradas", value: "0", sub: "esta semana", icon: Search },
-          { label: "Alertas enviadas", value: "0", sub: "este mes", icon: Bell },
-          { label: "CV generados", value: "0", sub: "en total", icon: FileText },
+          { label: "Vacantes encontradas", value: loadingVacantes ? "…" : vacantesEstaSemana, sub: "esta semana", icon: Search },
+          { label: "Alertas enviadas", value: profile?.alertasEnviadas ?? 0, sub: "en total", icon: Bell },
+          { label: "CV generados", value: profile?.cvGenerados ?? 0, sub: "en total", icon: FileText },
           { label: "Días activo", value: diasActivo, sub: "en la plataforma", icon: Calendar },
         ].map((m, i) => {
           const Icon = m.icon;
@@ -203,15 +231,42 @@ export default function Dashboard() {
             Ver todas →
           </Link>
         </div>
-        <div className="text-center py-12 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
-          <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="font-bold text-[#0F2744] text-xs mb-1">
-            Escaneando fuentes de empleo...
-          </p>
-          <p className="text-slate-400 text-[11px]">
-            Recibirás notificaciones automáticas tan pronto como haya coincidencias con tu perfil.
-          </p>
-        </div>
+        {!loadingVacantes && vacantes.length > 0 ? (
+          <div className="space-y-2">
+            {vacantes.slice(0, 5).map((v) => (
+              <a
+                key={v.job_id}
+                href={v.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 p-3 bg-slate-50/60 hover:bg-slate-100 border border-slate-200/60 rounded-lg transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#0F2744] truncate">{v.title}</p>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1 truncate">
+                      <Building2 className="w-3 h-3 flex-shrink-0" /> {v.company}
+                    </span>
+                    <span className="flex items-center gap-1 truncate">
+                      <MapPin className="w-3 h-3 flex-shrink-0" /> {v.location}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 flex-shrink-0">{v.source}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+            <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="font-bold text-[#0F2744] text-xs mb-1">
+              {loadingVacantes ? "Cargando vacantes..." : "Escaneando fuentes de empleo..."}
+            </p>
+            <p className="text-slate-400 text-[11px]">
+              Recibirás notificaciones automáticas tan pronto como haya coincidencias con tu perfil.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -359,6 +359,18 @@ def lambda_handler(event, context):
             send_notification_email(email, nombre, matched_jobs)
         except Exception as e:
             print(f"  Error enviando correo a {email}: {e}")
+            continue
+
+        # Contador para el resumen del dashboard — best-effort, no debe
+        # tirar la corrida si falla (el correo ya se mandó).
+        try:
+            dynamodb.Table(USERS_TABLE).update_item(
+                Key={"PK": f"USER#{user_id}", "SK": "SEARCH_PROFILE"},
+                UpdateExpression="ADD alertasEnviadas :one",
+                ExpressionAttributeValues={":one": 1},
+            )
+        except Exception as e:
+            print(f"  No se pudo incrementar alertasEnviadas para {user_id}: {e}")
 
     return {
         "statusCode": 200,

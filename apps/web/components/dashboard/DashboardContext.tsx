@@ -12,6 +12,8 @@ export interface DashboardProfile {
   createdAt: string;
   nombreCompleto?: string;
   apellidos?: string;
+  alertasEnviadas?: number;
+  cvGenerados?: number;
 }
 
 export interface DashboardContextValue {

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { generarCVPdfBuffer, type CVAjustadoData } from "@/lib/cvPdfTemplate";
@@ -120,6 +120,15 @@ Responde SOLO con JSON en este formato exacto:
     generarCVPdfBuffer(datosEs, "es"),
     generarCVPdfBuffer(datosEn, "en"),
   ]);
+
+  // Contador para el resumen del dashboard — best-effort, un fallo aquí no
+  // debe tirar la respuesta ya que los PDFs ya se generaron bien.
+  db.send(new UpdateCommand({
+    TableName: "buscatrabajito-users",
+    Key: { PK: `USER#${userId}`, SK: "SEARCH_PROFILE" },
+    UpdateExpression: "ADD cvGenerados :one",
+    ExpressionAttributeValues: { ":one": 1 },
+  })).catch((e) => console.error("No se pudo incrementar cvGenerados:", e));
 
   return NextResponse.json({
     es: { resumen: datosEs.resumen, tituloProfesional: datosEs.tituloProfesional, pdfBase64: pdfEsBuffer.toString("base64") },
