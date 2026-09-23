@@ -1,7 +1,7 @@
 """
 BuscoTrabajito — Scraper de vacantes multi-usuario
 Fuentes activas: OCC Mundial, LinkedIn Jobs, Computrabajo, Talenteca,
-                  Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX
+                  Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX, Ternium
 Definidas pero inactivas (no están en la lista `scrapers` de main()):
                   Bumeran, Remotive, We Work Remotely, Himalayas
 
@@ -183,6 +183,41 @@ def normalizar_location_cemex(location: str) -> str:
     ciudad = partes[0]
     estado = CEMEX_ESTADOS.get(partes[1].strip().lower(), partes[1].strip())
     return f"{ciudad}, {estado}"
+
+
+# Ternium (acero) opera en pocas ciudades fijas en México — a diferencia
+# de CEMEX, su careers site (mismo SuccessFactors pero con tema de
+# tarjetas en vez de tabla) solo da ciudad + país, sin estado. Se mapea
+# a mano en vez de necesitar un catálogo completo de municipios.
+TERNIUM_CIUDAD_A_ESTADO = {
+    "colima": "Colima",
+    "puebla": "Puebla",
+    "san luis potosi": "San Luis Potosí",
+    "san nicolas de los garza": "Nuevo León",
+    "pesqueria": "Nuevo León",
+    "guadalupe": "Nuevo León",
+    "apodaca": "Nuevo León",
+    "monterrey": "Nuevo León",
+    "ecatepec": "Estado de México",
+    "toluca": "Estado de México",
+    "tultitlan": "Estado de México",
+}
+
+
+def normalizar_location_ternium(ciudad: str, country: str) -> str:
+    """Igual que con CEMEX: se normaliza aquí para no tocar la lógica de
+    matching por estado (ya duplicada en matching.py y route.ts)."""
+    if country.strip().upper() != "MX":
+        return f"{ciudad}, {country}".strip(", ")
+    ciudad_plain = unicodedata.normalize("NFKD", ciudad.strip().lower()).encode("ascii", "ignore").decode()
+    estado = TERNIUM_CIUDAD_A_ESTADO.get(ciudad_plain)
+    if estado:
+        return f"{ciudad.strip()}, {estado}"
+    # Sin mapeo conocido (ej. "México" a secas, la oficina corporativa, o
+    # una ciudad nueva que Ternium agregue) — se deja tal cual. Si es
+    # exactamente "México", cae en el mismo caso "location genérico" que
+    # ya manejan matching.py y route.ts.
+    return ciudad.strip()
 
 
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
@@ -957,6 +992,61 @@ def scrape_cemex(terms: list[str]) -> list[dict]:
     return jobs
 
 
+def scrape_ternium(terms: list[str]) -> list[dict]:
+    """Ternium usa el mismo SAP SuccessFactors que CEMEX, pero con un
+    tema visual de tarjetas (<li class="job-tile" data-url="...">) en
+    vez de tabla — selectores distintos, mismo motor de búsqueda por
+    palabra clave."""
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    RESULTS_PER_PAGE = 10
+    MAX_PAGES = 2
+    for term in terms:
+        for page in range(MAX_PAGES):
+            startrow = page * RESULTS_PER_PAGE
+            url = (
+                "https://carrera.ternium.com/search/"
+                f"?q={requests.utils.quote(term)}&locale=es_MX&startrow={startrow}"
+            )
+            r = safe_get(url)
+            if not r:
+                break
+            soup  = BeautifulSoup(r.text, "html.parser")
+            tiles = soup.select("li.job-tile")
+            if not tiles:
+                break
+
+            for tile in tiles:
+                try:
+                    href = tile.get("data-url", "")
+                    if not href:
+                        continue
+                    title_el = tile.select_one("a.jobTitle-link")
+                    title    = title_el.get_text(strip=True) if title_el else ""
+                    if not title:
+                        continue
+
+                    link = href if href.startswith("http") else f"https://carrera.ternium.com{href}"
+
+                    loc_el     = tile.find(id=re.compile(r"-location-value$"))
+                    country_el = tile.find(id=re.compile(r"-country-value$"))
+                    ciudad     = loc_el.get_text(strip=True) if loc_el else ""
+                    country    = country_el.get_text(strip=True) if country_el else ""
+                    location   = normalizar_location_ternium(ciudad, country) if ciudad else "México"
+
+                    if is_relevant(title, location, keywords):
+                        jobs.append({"source": "Ternium", "title": title, "company": "Ternium",
+                                     "location": location, "link": link,
+                                     "job_id": job_id(title, "Ternium", location)})
+                except Exception as e:
+                    print(f"  Ternium card error: {e}")
+
+            if len(tiles) < RESULTS_PER_PAGE:
+                break
+    print(f"Ternium: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
     new_jobs        = []
@@ -989,6 +1079,7 @@ def main(event=None, context=None):
         ("OXXO", lambda: scrape_eightfold(terms, "OXXO", "careers.oxxo.com", "oxxo.com")),
         ("Coca-Cola FEMSA", lambda: scrape_eightfold(terms, "Coca-Cola FEMSA", "coca-colafemsa.eightfold.ai", "coca-colafemsa.com")),
         ("CEMEX", lambda: scrape_cemex(terms)),
+        ("Ternium", lambda: scrape_ternium(terms)),
     ]
 
     all_jobs = []
