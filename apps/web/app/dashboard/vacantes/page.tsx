@@ -67,6 +67,11 @@ interface Perfil {
 
 const MOTIVOS_DESCARTE: { value: string; label: string }[] = [
   { value: "puesto", label: "No es mi puesto o área" },
+  // Distinto de "puesto" a propósito: aquí el usuario dice que su
+  // búsqueda SÍ está bien configurada, fue esta vacante en particular la
+  // que se matcheó mal (falso positivo del algoritmo) — no debe sumar a
+  // la sugerencia de "quita este puesto de tus búsquedas".
+  { value: "vacante_incorrecta", label: "Mi búsqueda está bien, esta vacante no corresponde" },
   { value: "salario", label: "El salario no me sirve" },
   { value: "ubicacion", label: "La ubicación no me sirve" },
   { value: "otro", label: "Ya no me interesa / otro" },
@@ -526,7 +531,7 @@ function VacanteCard({
   onDescartar: (motivo: string) => void;
   onRestaurar: () => void;
 }) {
-  const [mostrarMotivos, setMostrarMotivos] = useState(false);
+  const [mostrarPopover, setMostrarPopover] = useState(false);
 
   const configFuente = SOURCE_CONFIG[vacante.source] ?? {
     bg: "bg-slate-100",
@@ -545,31 +550,60 @@ function VacanteCard({
     >
       <button
         type="button"
-        onClick={() => (vacante.descartada ? onRestaurar() : setMostrarMotivos((v) => !v))}
+        onClick={() => setMostrarPopover((v) => !v)}
         title={vacante.descartada ? "Restaurar vacante" : "No me interesa — ocultar"}
         className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
       >
         {vacante.descartada ? <RotateCcw className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
       </button>
 
-      {mostrarMotivos && (
+      {mostrarPopover && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setMostrarMotivos(false)} aria-hidden="true" />
-          <div className="absolute top-12 right-4 z-20 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 space-y-0.5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">¿Por qué no te interesa?</p>
-            {MOTIVOS_DESCARTE.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => {
-                  onDescartar(m.value);
-                  setMostrarMotivos(false);
-                }}
-                className="w-full text-left px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
-              >
-                {m.label}
-              </button>
-            ))}
+          <div className="fixed inset-0 z-10" onClick={() => setMostrarPopover(false)} aria-hidden="true" />
+          <div className="absolute top-12 right-4 z-20 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 space-y-0.5">
+            {vacante.descartada ? (
+              <div className="p-1.5 space-y-2">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  ¿Restaurar esta vacante? Va a volver a aparecer en tu lista.
+                </p>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRestaurar();
+                      setMostrarPopover(false);
+                    }}
+                    className="flex-1 px-2 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Sí, restaurar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarPopover(false)}
+                    className="flex-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">¿Por qué no te interesa?</p>
+                {MOTIVOS_DESCARTE.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => {
+                      onDescartar(m.value);
+                      setMostrarPopover(false);
+                    }}
+                    className="w-full text-left px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </>
       )}
