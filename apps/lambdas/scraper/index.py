@@ -2,7 +2,7 @@
 BuscoTrabajito — Scraper de vacantes multi-usuario
 Fuentes activas: OCC Mundial, LinkedIn Jobs, Computrabajo, Talenteca,
                   Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX, Ternium,
-                  Grupo Modelo
+                  Grupo Modelo, Cargill
 Definidas pero inactivas (no están en la lista `scrapers` de main()):
                   Bumeran, Remotive, We Work Remotely, Himalayas
 
@@ -1130,6 +1130,66 @@ def scrape_workday(terms: list[str], source_name: str, wd_host: str, tenant: str
     return jobs
 
 
+def scrape_cargill(terms: list[str]) -> list[dict]:
+    """Cargill usa TalentBrew (Radancy) — a diferencia de Whirlpool/
+    Schneider/Chedraui, sí sirve el HTML de resultados directo (sin
+    esperar JS), con paginación real vía ?p=N. Cargill opera en toda
+    LATAM (Paraguay, Colombia, Argentina, etc., no solo México) — las
+    vacantes fuera de México se dejan pasar tal cual, mismo criterio
+    que ya se usa con Ternium: no van a matchear ningún estado
+    mexicano de todos modos."""
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    MAX_PAGES = 2
+    for term in terms:
+        slug = slugify(term)
+        if not slug:
+            continue
+        for page in range(1, MAX_PAGES + 1):
+            # La página 1 real es la URL sin "?p=" — agregarlo (incluso
+            # como "?p=1") hace que ignore el término buscado y devuelva
+            # una mezcla genérica de vacantes de toda la empresa.
+            url = f"https://careers.cargill.com/es/search-jobs/{slug}/"
+            if page > 1:
+                url += f"?p={page}"
+            r = safe_get(url)
+            if not r:
+                break
+            soup       = BeautifulSoup(r.text, "html.parser")
+            contenedor = soup.find(id="search-results-list")
+            items      = contenedor.find_all("li") if contenedor else []
+            if not items:
+                break
+
+            for li in items:
+                try:
+                    a = li.find("a")
+                    if not a:
+                        continue
+                    title_el = a.find("h3")
+                    title    = title_el.get_text(strip=True) if title_el else ""
+                    if not title:
+                        continue
+
+                    href = a.get("href", "")
+                    link = href if href.startswith("http") else f"https://careers.cargill.com{href}"
+
+                    loc_el   = a.find(class_="job-location")
+                    location = loc_el.get_text(strip=True) if loc_el else "México"
+
+                    if is_relevant(title, location, keywords):
+                        jobs.append({"source": "Cargill", "title": title, "company": "Cargill",
+                                     "location": location, "link": link,
+                                     "job_id": job_id(title, "Cargill", location)})
+                except Exception as e:
+                    print(f"  Cargill card error: {e}")
+
+            if len(items) < 10:
+                break
+    print(f"Cargill: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
     new_jobs        = []
@@ -1164,6 +1224,7 @@ def main(event=None, context=None):
         ("CEMEX", lambda: scrape_cemex(terms)),
         ("Ternium", lambda: scrape_ternium(terms)),
         ("Grupo Modelo", lambda: scrape_workday(terms, "Grupo Modelo", "wd1.myworkdaysite.com", "abinbev", "MEX")),
+        ("Cargill", lambda: scrape_cargill(terms)),
     ]
 
     all_jobs = []
