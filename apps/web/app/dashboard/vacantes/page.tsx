@@ -19,6 +19,8 @@ import {
   Archive,
   Lightbulb,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface CVAjustadoIdioma {
@@ -191,6 +193,7 @@ export default function VacantesPage() {
   const [agrupa, setAgrupa] = useState<AgrupaKey>("ninguno");
   const [soloRemoto, setSoloRemoto] = useState(false);
   const [verDescartadas, setVerDescartadas] = useState(false);
+  const [gruposColapsados, setGruposColapsados] = useState<Set<string>>(new Set());
   const [perfiles, setPerfiles] = useState<Perfil[]>([]);
   const [sugerenciasOcultas, setSugerenciasOcultas] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
@@ -281,6 +284,15 @@ export default function VacantesPage() {
   }
 
   const totalDescartadas = useMemo(() => vacantes.filter((v) => v.descartada).length, [vacantes]);
+
+  function toggleGrupo(etiqueta: string) {
+    setGruposColapsados((prev) => {
+      const next = new Set(prev);
+      if (next.has(etiqueta)) next.delete(etiqueta);
+      else next.add(etiqueta);
+      return next;
+    });
+  }
 
   // Filtrado por búsqueda, "solo remoto" y descartadas/activas en tiempo real
   const vacantesFiltradas = useMemo(() => {
@@ -483,35 +495,50 @@ export default function VacantesPage() {
       )}
 
       {/* Listado de Vacantes */}
-      {grupos.map((grupo) => (
+      {grupos.map((grupo) => {
+        const colapsado = grupo.etiqueta !== null && gruposColapsados.has(grupo.etiqueta);
+        return (
         <div key={grupo.etiqueta ?? "todas"} className="space-y-3">
           {grupo.etiqueta !== null && (
-            <div className="flex items-center gap-2 px-1 pt-2">
-              <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
-              <h2 className="text-xs font-black text-[#0F2744] uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => toggleGrupo(grupo.etiqueta as string)}
+              className="w-full flex items-center gap-2 px-1 pt-2 cursor-pointer group/header"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#2563EB] flex-shrink-0" />
+              <h2 className="text-xs font-black text-[#0F2744] uppercase tracking-wider group-hover/header:text-[#2563EB] transition-colors">
                 {grupo.etiqueta}
               </h2>
               <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                 {grupo.items.length}
               </span>
-            </div>
+              <span className="flex-1" />
+              {colapsado ? (
+                <ChevronDown className="w-4 h-4 text-slate-400 group-hover/header:text-[#2563EB] transition-colors" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-slate-400 group-hover/header:text-[#2563EB] transition-colors" />
+              )}
+            </button>
           )}
 
-          <div className="space-y-3">
-            {grupo.items.map((vacante) => (
-              <VacanteCard
-                key={vacante.SK}
-                vacante={vacante}
-                ajustando={ajustando === vacante.job_id}
-                cvAjustado={cvAjustado[vacante.job_id]}
-                onAjustar={() => ajustarCV(vacante)}
-                onDescartar={(motivo) => descartarVacante(vacante.job_id, true, motivo)}
-                onRestaurar={() => descartarVacante(vacante.job_id, false)}
-              />
-            ))}
-          </div>
+          {!colapsado && (
+            <div className="space-y-3">
+              {grupo.items.map((vacante) => (
+                <VacanteCard
+                  key={vacante.SK}
+                  vacante={vacante}
+                  ajustando={ajustando === vacante.job_id}
+                  cvAjustado={cvAjustado[vacante.job_id]}
+                  onAjustar={() => ajustarCV(vacante)}
+                  onDescartar={(motivo) => descartarVacante(vacante.job_id, true, motivo)}
+                  onRestaurar={() => descartarVacante(vacante.job_id, false)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
