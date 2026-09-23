@@ -278,23 +278,39 @@ def save_match(user_id: str, job: dict):
     table = dynamodb.Table(USERS_TABLE)
     now = int(datetime.now(timezone.utc).timestamp())
     # SK fija por job_id (no por timestamp): si esta vacante ya se le
-    # había guardado a este usuario, la sobreescribe en vez de duplicarla
-    # (puede pasar si dos corridas del scraper se solapan).
-    table.put_item(Item={
-        "PK": f"USER#{user_id}",
-        "SK": f"JOB#{job['job_id']}",
-        "job_id": job["job_id"],
-        "title": job["title"],
-        "company": job["company"],
-        "location": job["location"],
-        "link": job["link"],
-        "source": job["source"],
-        "posted_date": job.get("posted_date", ""),
-        "idioma": job.get("idioma", ""),
-        "tipo_empleo": job.get("tipo_empleo", ""),
-        "seen_at": now,
-        "notified": False,
-    })
+    # había guardado a este usuario, la actualiza en vez de duplicarla
+    # (puede pasar si dos corridas del scraper se solapan, o si la misma
+    # vacante sigue publicada y vuelve a salir como "nueva" del dedup).
+    #
+    # update_item, NO put_item: un put_item reemplaza el item completo y
+    # borraría el "descartada"/"motivoDescarte" que el usuario ya había
+    # elegido cada vez que esta vacante se vuelve a matchear — con
+    # put_item, algo que el usuario marcó como "no me interesa" podía
+    # reaparecer solo porque el scraper la volvió a encontrar.
+    table.update_item(
+        Key={"PK": f"USER#{user_id}", "SK": f"JOB#{job['job_id']}"},
+        UpdateExpression=(
+            "SET job_id = :jid, title = :title, company = :company, "
+            "location = :location, link = :link, #src = :src, "
+            "posted_date = :posted_date, idioma = :idioma, "
+            "tipo_empleo = :tipo_empleo, seen_at = :seen_at, "
+            "notified = if_not_exists(notified, :notified_default)"
+        ),
+        ExpressionAttributeNames={"#src": "source"},
+        ExpressionAttributeValues={
+            ":jid": job["job_id"],
+            ":title": job["title"],
+            ":company": job["company"],
+            ":location": job["location"],
+            ":link": job["link"],
+            ":src": job["source"],
+            ":posted_date": job.get("posted_date", ""),
+            ":idioma": job.get("idioma", ""),
+            ":tipo_empleo": job.get("tipo_empleo", ""),
+            ":seen_at": now,
+            ":notified_default": False,
+        },
+    )
 
 
 def send_notification_email(email: str, nombre: str, jobs: list[dict]):
