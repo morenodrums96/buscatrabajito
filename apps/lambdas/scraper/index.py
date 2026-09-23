@@ -1,7 +1,9 @@
 """
 BuscoTrabajito — Scraper de vacantes multi-usuario
-Fuentes: OCC Mundial, LinkedIn Jobs, Computrabajo, Bumeran,
-         Remotive, We Work Remotely, Himalayas
+Fuentes activas: OCC Mundial, LinkedIn Jobs, Computrabajo, Talenteca,
+                  Freelancer.com, OXXO, Coca-Cola FEMSA
+Definidas pero inactivas (no están en la lista `scrapers` de main()):
+                  Bumeran, Remotive, We Work Remotely, Himalayas
 
 Los términos de búsqueda se derivan dinámicamente de los puestos que
 los usuarios de BuscoTrabajito guardaron en sus preferencias
@@ -781,6 +783,70 @@ def scrape_himalayas(terms: list[str]) -> list[dict]:
     return jobs
 
 
+def scrape_eightfold(terms: list[str], source_name: str, api_host: str, domain_param: str) -> list[dict]:
+    """OXXO y Coca-Cola FEMSA publican sus vacantes en Eightfold.ai (careers
+    site propio con dominio blanco, o subdominio directo de eightfold.ai) —
+    misma API pública en ambos casos, solo cambian el host y el 'domain'
+    de la empresa (encontrado inspeccionando el HTML/cookies de cada
+    careers site, no es un parámetro documentado). La API pagina fijo en
+    10 resultados por página sin importar el 'num' que se pida.
+    """
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    RESULTS_PER_PAGE = 10
+    MAX_PAGES = 3
+    for term in terms:
+        for page in range(MAX_PAGES):
+            start = page * RESULTS_PER_PAGE
+            url = (
+                f"https://{api_host}/api/apply/v2/jobs"
+                f"?domain={domain_param}&start={start}&num={RESULTS_PER_PAGE}"
+                f"&query={requests.utils.quote(term)}"
+            )
+            try:
+                time.sleep(random.uniform(1.0, 2.0))
+                r = requests.get(url, headers=random_headers(), timeout=15)
+                if r.status_code != 200:
+                    print(f"  {source_name} API {r.status_code}: {term}")
+                    break
+                data = r.json()
+            except Exception as e:
+                print(f"  {source_name} error [{term}] pág {page}: {e}")
+                break
+
+            positions = data.get("positions", [])
+            if not positions:
+                break
+
+            for p in positions:
+                try:
+                    title    = p.get("name", "")
+                    location = p.get("location", "México")
+                    link     = p.get("canonicalPositionUrl", "")
+                    t_create = p.get("t_create")
+                    posted_date = (
+                        datetime.fromtimestamp(t_create, tz=timezone.utc).strftime("%Y-%m-%d")
+                        if t_create else ""
+                    )
+                    if title and is_relevant(title, location, keywords):
+                        jobs.append({
+                            "source": source_name, "title": title, "company": source_name,
+                            "location": location, "link": link, "posted_date": posted_date,
+                            # El id numérico de Eightfold es único y estable — mismo
+                            # patrón que Freelancer.com, se hashea junto con la fuente
+                            # en vez de title+company+location (muchos títulos se
+                            # repiten entre sucursales/ciudades).
+                            "job_id": job_id(title, source_name, str(p.get("id", ""))),
+                        })
+                except Exception as e:
+                    print(f"  {source_name} item error: {e}")
+
+            if data.get("count", 0) <= start + RESULTS_PER_PAGE:
+                break
+    print(f"{source_name}: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
     new_jobs        = []
@@ -810,6 +876,8 @@ def main(event=None, context=None):
         ("OCC", lambda: scrape_occ(terms)),
         ("Computrabajo", lambda: scrape_computrabajo(terms)),
         ("Talenteca", lambda: scrape_talenteca(terms)),
+        ("OXXO", lambda: scrape_eightfold(terms, "OXXO", "careers.oxxo.com", "oxxo.com")),
+        ("Coca-Cola FEMSA", lambda: scrape_eightfold(terms, "Coca-Cola FEMSA", "coca-colafemsa.eightfold.ai", "coca-colafemsa.com")),
     ]
 
     all_jobs = []

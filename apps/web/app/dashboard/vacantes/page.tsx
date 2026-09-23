@@ -104,6 +104,8 @@ const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }
   Himalayas: { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" },
   Freelancer: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200" },
   Talenteca: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  OXXO: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200" },
+  "Coca-Cola FEMSA": { bg: "bg-pink-50", text: "text-pink-700", border: "border-pink-200" },
 };
 
 const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
