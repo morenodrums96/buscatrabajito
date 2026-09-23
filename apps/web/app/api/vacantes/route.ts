@@ -214,8 +214,16 @@ export async function GET() {
     return (job.seen_at as number) ?? 0;
   }
 
+  // Buscamos vacantes de "hoy a hace 15 días" — algunas fuentes (OCC,
+  // Computrabajo) devuelven en sus resultados de búsqueda ofertas que
+  // llevan abiertas semanas, y sin este corte se cuelan junto con las
+  // recién publicadas.
+  const QUINCE_DIAS_SEGUNDOS = 15 * 24 * 60 * 60;
+  const limiteAntiguedad = Date.now() / 1000 - QUINCE_DIAS_SEGUNDOS;
+
   const items = (jobsResult.Items ?? [])
     .filter((job) => sinPreferencias || coincideConPreferencias(job, estadosDeseados, modalidadDeseada, modalidadPorEstado, idiomasDeseados, tiposTrabajoDeseados))
+    .filter((job) => fechaParaOrdenar(job) >= limiteAntiguedad)
     .sort((a, b) => fechaParaOrdenar(b) - fechaParaOrdenar(a));
 
   return NextResponse.json(items);

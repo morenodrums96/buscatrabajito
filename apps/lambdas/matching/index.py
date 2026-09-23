@@ -79,7 +79,32 @@ def detectar_tipo_empleo(titulo: str) -> str:
     return "Tiempo completo"
 
 
+# Buscamos vacantes de "hoy a hace 15 días" — OCC y Computrabajo devuelven
+# en sus resultados de búsqueda ofertas que llevan abiertas semanas, y sin
+# este corte se cuelan junto con las recién publicadas.
+MAX_DIAS_ANTIGUEDAD = 15
+
+
+def vacante_es_reciente(job: dict) -> bool:
+    """Sin posted_date (fuentes que no lo reportan, ej. Freelancer/Remotive)
+    no hay forma de saber la antigüedad real, así que se deja pasar en vez
+    de descartarla a ciegas."""
+    posted_date = job.get("posted_date") or ""
+    if not posted_date:
+        return True
+    try:
+        fecha = datetime.strptime(posted_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    dias = (datetime.now(timezone.utc) - fecha).days
+    return dias <= MAX_DIAS_ANTIGUEDAD
+
+
 def job_matches_profile(job: dict, profile: dict) -> bool:
+    if not vacante_es_reciente(job):
+        print(f"  NO MATCH (vacante muy antigua, posted_date={job.get('posted_date')})")
+        return False
+
     puesto = profile.get("puesto", "").lower()
     terminos_busqueda = profile.get("terminos_busqueda") or []
     job_title = job.get("title", "").lower()
