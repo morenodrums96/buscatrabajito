@@ -64,13 +64,22 @@ interface TooltipPos {
   arrowOffset: number;
 }
 
-export default function ProductTour({ onFinish }: { onFinish: () => void }) {
+interface ProductTourProps {
+  onFinish: () => void;
+  // En móvil el sidebar es un drawer oculto por defecto; el tour necesita
+  // poder abrirlo cuando un paso apunta a un elemento que vive ahí adentro,
+  // si no, calcula la posición sobre un elemento fuera de pantalla.
+  onRequireSidebar?: (open: boolean) => void;
+}
+
+export default function ProductTour({ onFinish, onRequireSidebar }: ProductTourProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ top: 0, left: 0, arrow: "up", arrowOffset: 0 });
   const [ready, setReady] = useState(false);
 
   const step = TOUR_STEPS[stepIndex];
+  const needsSidebar = step.target.includes("sidebar-");
 
   const calcPositions = useCallback(() => {
     const el = document.querySelector(step.target);
@@ -129,9 +138,31 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
     setTooltipPos({ top, left, arrow, arrowOffset });
   }, [step]);
 
+  // Si el paso apunta a algo dentro del sidebar y estamos en móvil, hay que
+  // abrir el drawer antes de poder medir su posición real en pantalla.
+  useEffect(() => {
+    if (!onRequireSidebar) return;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    onRequireSidebar(isMobile && needsSidebar);
+  }, [needsSidebar, onRequireSidebar]);
+
+  // Al desmontar (tour cerrado o terminado), no dejar el drawer atorado abierto.
+  useEffect(() => {
+    return () => {
+      onRequireSidebar?.(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     window.addEventListener("resize", calcPositions);
     window.addEventListener("scroll", calcPositions, true);
+
+    const isMobile = window.innerWidth < 768;
+    // El drawer del sidebar tarda ~300ms en deslizarse (transition-transform
+    // duration-300); si el paso lo necesita, hay que esperar a que termine
+    // antes de medir, si no el rect queda calculado a medio camino.
+    const waitForDrawer = isMobile && needsSidebar;
 
     if (stepIndex === 0 && !ready) {
       const settle = setTimeout(() => {
@@ -145,11 +176,12 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
       };
     }
 
+    const delay = waitForDrawer ? 350 : 0;
     const immediate = setTimeout(() => {
       calcPositions();
       setReady(true);
-    }, 0);
-    const timer = setTimeout(calcPositions, 100);
+    }, delay);
+    const timer = setTimeout(calcPositions, waitForDrawer ? 400 : 100);
 
     return () => {
       clearTimeout(immediate);
@@ -157,7 +189,7 @@ export default function ProductTour({ onFinish }: { onFinish: () => void }) {
       window.removeEventListener("resize", calcPositions);
       window.removeEventListener("scroll", calcPositions, true);
     };
-  }, [calcPositions, stepIndex, ready]);
+  }, [calcPositions, stepIndex, ready, needsSidebar]);
 
   function finish() {
     localStorage.setItem(TOUR_KEY, "1");

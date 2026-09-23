@@ -141,7 +141,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <DashboardContext.Provider value={{ profile, displayName, setDisplayName, plan }}>
                 {children}
               </DashboardContext.Provider>
-              {showTour && <ProductTour onFinish={endTour} />}
+              {showTour && <ProductTour onFinish={endTour} onRequireSidebar={setSidebarOpen} />}
             </motion.div>
           )}
         </AnimatePresence>
