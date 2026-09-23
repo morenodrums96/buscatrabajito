@@ -60,9 +60,12 @@ interface Rect {
 interface TooltipPos {
   top: number;
   left: number;
-  arrow: "up" | "down" | "left" | "right";
+  width: number;
+  arrow: "up" | "down" | "left" | "right" | "none";
   arrowOffset: number;
 }
+
+const MOBILE_BREAKPOINT = 768;
 
 interface ProductTourProps {
   onFinish: () => void;
@@ -75,7 +78,7 @@ interface ProductTourProps {
 export default function ProductTour({ onFinish, onRequireSidebar }: ProductTourProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ top: 0, left: 0, arrow: "up", arrowOffset: 0 });
+  const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ top: 0, left: 0, width: 320, arrow: "up", arrowOffset: 0 });
   const [ready, setReady] = useState(false);
 
   const step = TOUR_STEPS[stepIndex];
@@ -94,9 +97,27 @@ export default function ProductTour({ onFinish, onRequireSidebar }: ProductTourP
       height: r.height + pad * 2,
     });
 
-    const tooltipW = step.width ?? 320;
     const tooltipH = 200;
     const margin = 16;
+
+    // En pantallas angostas no hay espacio para "apuntar" al lado del
+    // elemento (el sidebar-drawer ocupa casi todo el ancho, y las tarjetas
+    // de 320-450px se salen de la pantalla) — anclamos la tarjeta abajo,
+    // tipo bottom-sheet, con ancho ajustado. El spotlight (que sí mide el
+    // elemento real) sigue señalando el foco correcto.
+    if (window.innerWidth < MOBILE_BREAKPOINT) {
+      const tooltipWMobile = window.innerWidth - margin * 2;
+      setTooltipPos({
+        top: window.innerHeight - tooltipH - margin,
+        left: margin,
+        width: tooltipWMobile,
+        arrow: "none",
+        arrowOffset: 0,
+      });
+      return;
+    }
+
+    const tooltipW = step.width ?? 320;
     let top = 0;
     let left = 0;
     let arrow: TooltipPos["arrow"] = "up";
@@ -135,7 +156,7 @@ export default function ProductTour({ onFinish, onRequireSidebar }: ProductTourP
       arrowOffset = Math.max(24, Math.min(centroY - top, tooltipH - 24));
     }
 
-    setTooltipPos({ top, left, arrow, arrowOffset });
+    setTooltipPos({ top, left, width: tooltipW, arrow, arrowOffset });
   }, [step]);
 
   // Si el paso apunta a algo dentro del sidebar y estamos en móvil, hay que
@@ -268,7 +289,7 @@ export default function ProductTour({ onFinish, onRequireSidebar }: ProductTourP
           exit={{ opacity: 0, scale: 0.94 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
           className="absolute bg-slate-900 border-2 border-slate-600/90 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-5 pointer-events-auto"
-          style={{ top: tooltipPos.top, left: tooltipPos.left, width: step.width ?? 320 }}
+          style={{ top: tooltipPos.top, left: tooltipPos.left, width: tooltipPos.width }}
         >
           {/* Flechas indicadoras */}
           {tooltipPos.arrow === "up" && (
