@@ -32,6 +32,7 @@ interface Vacante {
   link: string;
   source: string;
   seen_at: number;
+  descartada?: boolean;
 }
 
 const UNA_SEMANA_SEGUNDOS = 7 * 24 * 60 * 60;
@@ -65,7 +66,7 @@ export default function Dashboard() {
     fetch("/api/vacantes")
       .then((r) => r.json())
       .then((data) => {
-        const items: Vacante[] = Array.isArray(data) ? data : [];
+        const items: Vacante[] = (Array.isArray(data) ? data : []).filter((v: Vacante) => !v.descartada);
         setVacantes(items);
         const ahora = Date.now() / 1000;
         setVacantesEstaSemana(items.filter((v) => ahora - v.seen_at < UNA_SEMANA_SEGUNDOS).length);

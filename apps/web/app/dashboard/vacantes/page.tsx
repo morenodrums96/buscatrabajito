@@ -14,6 +14,9 @@ import {
   Briefcase,
   Filter,
   Globe,
+  EyeOff,
+  RotateCcw,
+  Archive,
 } from "lucide-react";
 
 interface CVAjustadoIdioma {
@@ -52,6 +55,7 @@ interface Vacante {
   source: string;
   seen_at: number;
   posted_date?: string;
+  descartada?: boolean;
 }
 
 const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
@@ -152,6 +156,7 @@ export default function VacantesPage() {
   const [orden, setOrden] = useState<OrdenKey>("fecha_desc");
   const [agrupa, setAgrupa] = useState<AgrupaKey>("ninguno");
   const [soloRemoto, setSoloRemoto] = useState(false);
+  const [verDescartadas, setVerDescartadas] = useState(false);
 
   useEffect(() => {
     fetch("/api/vacantes")
@@ -183,10 +188,28 @@ export default function VacantesPage() {
     setAjustando(null);
   }
 
-  // Filtrado por búsqueda y "solo remoto" en tiempo real
+  // Optimista: actualiza local de inmediato y avisa al backend en paralelo,
+  // para que ocultar/restaurar se sienta instantáneo.
+  async function descartarVacante(jobId: string, descartada: boolean) {
+    setVacantes((prev) =>
+      prev.map((v) => (v.job_id === jobId ? { ...v, descartada } : v))
+    );
+    try {
+      await fetch("/api/vacantes/descartar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: jobId, descartada }),
+      });
+    } catch {}
+  }
+
+  const totalDescartadas = useMemo(() => vacantes.filter((v) => v.descartada).length, [vacantes]);
+
+  // Filtrado por búsqueda, "solo remoto" y descartadas/activas en tiempo real
   const vacantesFiltradas = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
     return vacantes.filter((v) => {
+      if (verDescartadas ? !v.descartada : v.descartada) return false;
       if (soloRemoto && !esRemota(v)) return false;
       if (!term) return true;
       return (
@@ -195,7 +218,7 @@ export default function VacantesPage() {
         v.location.toLowerCase().includes(term)
       );
     });
-  }, [vacantes, busqueda, soloRemoto]);
+  }, [vacantes, busqueda, soloRemoto, verDescartadas]);
 
   // Grupos ordenados
   const grupos = useMemo(() => {
@@ -266,6 +289,22 @@ export default function VacantesPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
+                onClick={() => setVerDescartadas((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer ${
+                  verDescartadas
+                    ? "bg-blue-50 text-[#2563EB] border-blue-200"
+                    : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                <Archive className="w-3.5 h-3.5" />
+                {verDescartadas ? "Viendo descartadas" : "Descartadas"}
+                {totalDescartadas > 0 && (
+                  <span className="bg-white/70 px-1.5 rounded-full text-[10px]">{totalDescartadas}</span>
+                )}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setSoloRemoto((v) => !v)}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer ${
                   soloRemoto
@@ -318,10 +357,16 @@ export default function VacantesPage() {
             🔍
           </div>
           <h2 className="font-extrabold text-slate-800 text-sm">
-            {busqueda || soloRemoto ? "No se encontraron vacantes" : "Buscando vacantes para ti..."}
+            {verDescartadas
+              ? "No has descartado ninguna vacante"
+              : busqueda || soloRemoto
+              ? "No se encontraron vacantes"
+              : "Buscando vacantes para ti..."}
           </h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            {busqueda || soloRemoto
+            {verDescartadas
+              ? "Las vacantes que marques como \"No me interesa\" aparecen aquí, por si quieres recuperar alguna."
+              : busqueda || soloRemoto
               ? "Prueba cambiando los términos de búsqueda o quitando el filtro de \"Solo remoto\"."
               : "Revisamos más de 7 portales en cuanto guardas tu perfil — esto toma unos minutos la primera vez. Vuelve a checar en un rato."}
           </p>
@@ -351,6 +396,7 @@ export default function VacantesPage() {
                 ajustando={ajustando === vacante.job_id}
                 cvAjustado={cvAjustado[vacante.job_id]}
                 onAjustar={() => ajustarCV(vacante)}
+                onDescartar={() => descartarVacante(vacante.job_id, !vacante.descartada)}
               />
             ))}
           </div>
@@ -365,11 +411,13 @@ function VacanteCard({
   ajustando,
   cvAjustado,
   onAjustar,
+  onDescartar,
 }: {
   vacante: Vacante;
   ajustando: boolean;
   cvAjustado?: CVAjustadoResultado;
   onAjustar: () => void;
+  onDescartar: () => void;
 }) {
   const configFuente = SOURCE_CONFIG[vacante.source] ?? {
     bg: "bg-slate-100",
@@ -381,8 +429,21 @@ function VacanteCard({
   const inicialEmpresa = vacante.company ? vacante.company.charAt(0).toUpperCase() : "B";
 
   return (
-    <div className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all group">
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+    <div
+      className={`relative bg-white border rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all group ${
+        vacante.descartada ? "border-slate-200/60 opacity-60 hover:opacity-100" : "border-slate-200/80 hover:border-slate-300"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onDescartar}
+        title={vacante.descartada ? "Restaurar vacante" : "No me interesa — ocultar"}
+        className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+      >
+        {vacante.descartada ? <RotateCcw className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+      </button>
+
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pr-8">
         
         {/* Lado Izquierdo: Logo + Info Principal */}
         <div className="flex items-start gap-3.5 flex-1 min-w-0">
