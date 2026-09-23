@@ -17,6 +17,8 @@ import {
   EyeOff,
   RotateCcw,
   Archive,
+  Lightbulb,
+  X,
 } from "lucide-react";
 
 interface CVAjustadoIdioma {
@@ -56,6 +58,30 @@ interface Vacante {
   seen_at: number;
   posted_date?: string;
   descartada?: boolean;
+  motivoDescarte?: string;
+}
+
+interface Perfil {
+  puesto: string;
+}
+
+const MOTIVOS_DESCARTE: { value: string; label: string }[] = [
+  { value: "puesto", label: "No es mi puesto o área" },
+  { value: "salario", label: "El salario no me sirve" },
+  { value: "ubicacion", label: "La ubicación no me sirve" },
+  { value: "otro", label: "Ya no me interesa / otro" },
+];
+
+const UMBRAL_SUGERENCIA = 3;
+
+// Misma heurística que usa el matching real (palabras > 3 letras del
+// puesto que aparecen en el título) — así la sugerencia de "quita este
+// puesto de tus búsquedas" se basa en exactamente lo que causó los
+// matches que se estuvieron descartando.
+function perfilCoincideConVacante(vacante: Vacante, perfil: Perfil): boolean {
+  const palabras = perfil.puesto.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const title = vacante.title.toLowerCase();
+  return palabras.some((w) => title.includes(w));
 }
 
 const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
@@ -157,6 +183,16 @@ export default function VacantesPage() {
   const [agrupa, setAgrupa] = useState<AgrupaKey>("ninguno");
   const [soloRemoto, setSoloRemoto] = useState(false);
   const [verDescartadas, setVerDescartadas] = useState(false);
+  const [perfiles, setPerfiles] = useState<Perfil[]>([]);
+  const [sugerenciasOcultas, setSugerenciasOcultas] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const guardado = localStorage.getItem("vacantes_sugerencias_ocultas");
+      return guardado ? new Set(JSON.parse(guardado)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   useEffect(() => {
     fetch("/api/vacantes")
@@ -166,7 +202,40 @@ export default function VacantesPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    fetch("/api/perfiles")
+      .then((r) => r.json())
+      .then((data) => setPerfiles(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, []);
+
+  function ocultarSugerencia(puesto: string) {
+    setSugerenciasOcultas((prev) => {
+      const next = new Set(prev).add(puesto);
+      try {
+        localStorage.setItem("vacantes_sugerencias_ocultas", JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  }
+
+  // Cuenta, por perfil de búsqueda, cuántas vacantes se descartaron con
+  // motivo "no es mi puesto o área" — si se pasa el umbral, se sugiere
+  // (no se aplica solo) quitar ese puesto de las búsquedas.
+  const sugerencias = useMemo(() => {
+    const conteos = new Map<string, number>();
+    for (const v of vacantes) {
+      if (!v.descartada || v.motivoDescarte !== "puesto") continue;
+      for (const p of perfiles) {
+        if (perfilCoincideConVacante(v, p)) {
+          conteos.set(p.puesto, (conteos.get(p.puesto) ?? 0) + 1);
+        }
+      }
+    }
+    return Array.from(conteos.entries())
+      .filter(([puesto, n]) => n >= UMBRAL_SUGERENCIA && !sugerenciasOcultas.has(puesto))
+      .map(([puesto, n]) => ({ puesto, n }));
+  }, [vacantes, perfiles, sugerenciasOcultas]);
 
   async function ajustarCV(vacante: Vacante) {
     setAjustando(vacante.job_id);
@@ -190,15 +259,15 @@ export default function VacantesPage() {
 
   // Optimista: actualiza local de inmediato y avisa al backend en paralelo,
   // para que ocultar/restaurar se sienta instantáneo.
-  async function descartarVacante(jobId: string, descartada: boolean) {
+  async function descartarVacante(jobId: string, descartada: boolean, motivo?: string) {
     setVacantes((prev) =>
-      prev.map((v) => (v.job_id === jobId ? { ...v, descartada } : v))
+      prev.map((v) => (v.job_id === jobId ? { ...v, descartada, motivoDescarte: motivo ?? v.motivoDescarte } : v))
     );
     try {
       await fetch("/api/vacantes/descartar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId, descartada }),
+        body: JSON.stringify({ job_id: jobId, descartada, motivo }),
       });
     } catch {}
   }
@@ -350,6 +419,38 @@ export default function VacantesPage() {
         )}
       </div>
 
+      {/* Sugerencias basadas en descartes repetidos */}
+      {sugerencias.map(({ puesto, n }) => (
+        <div
+          key={puesto}
+          className="flex items-start sm:items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4"
+        >
+          <div className="flex items-start sm:items-center gap-3">
+            <Lightbulb className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <p className="text-xs text-amber-900">
+              Descartaste <strong>{n}</strong> vacantes de <strong>&quot;{puesto}&quot;</strong> por no ser tu
+              puesto o área. ¿Quieres ajustar tus búsquedas para dejar de recibirlas?
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="/dashboard/cv"
+              className="inline-flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all"
+            >
+              Editar mis búsquedas
+            </a>
+            <button
+              type="button"
+              onClick={() => ocultarSugerencia(puesto)}
+              title="No volver a sugerir esto"
+              className="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+
       {/* Estado Vacío */}
       {vacantesFiltradas.length === 0 && (
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-xs space-y-3">
@@ -396,7 +497,8 @@ export default function VacantesPage() {
                 ajustando={ajustando === vacante.job_id}
                 cvAjustado={cvAjustado[vacante.job_id]}
                 onAjustar={() => ajustarCV(vacante)}
-                onDescartar={() => descartarVacante(vacante.job_id, !vacante.descartada)}
+                onDescartar={(motivo) => descartarVacante(vacante.job_id, true, motivo)}
+                onRestaurar={() => descartarVacante(vacante.job_id, false)}
               />
             ))}
           </div>
@@ -412,13 +514,17 @@ function VacanteCard({
   cvAjustado,
   onAjustar,
   onDescartar,
+  onRestaurar,
 }: {
   vacante: Vacante;
   ajustando: boolean;
   cvAjustado?: CVAjustadoResultado;
   onAjustar: () => void;
-  onDescartar: () => void;
+  onDescartar: (motivo: string) => void;
+  onRestaurar: () => void;
 }) {
+  const [mostrarMotivos, setMostrarMotivos] = useState(false);
+
   const configFuente = SOURCE_CONFIG[vacante.source] ?? {
     bg: "bg-slate-100",
     text: "text-slate-700",
@@ -436,12 +542,34 @@ function VacanteCard({
     >
       <button
         type="button"
-        onClick={onDescartar}
+        onClick={() => (vacante.descartada ? onRestaurar() : setMostrarMotivos((v) => !v))}
         title={vacante.descartada ? "Restaurar vacante" : "No me interesa — ocultar"}
         className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
       >
         {vacante.descartada ? <RotateCcw className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
       </button>
+
+      {mostrarMotivos && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setMostrarMotivos(false)} aria-hidden="true" />
+          <div className="absolute top-12 right-4 z-20 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 space-y-0.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">¿Por qué no te interesa?</p>
+            {MOTIVOS_DESCARTE.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => {
+                  onDescartar(m.value);
+                  setMostrarMotivos(false);
+                }}
+                className="w-full text-left px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pr-8">
         
