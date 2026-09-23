@@ -292,11 +292,13 @@ export default function VacantesPage() {
           <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
             🔍
           </div>
-          <h2 className="font-extrabold text-slate-800 text-sm">No se encontraron vacantes</h2>
+          <h2 className="font-extrabold text-slate-800 text-sm">
+            {busqueda || soloRemoto ? "No se encontraron vacantes" : "Buscando vacantes para ti..."}
+          </h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {busqueda || soloRemoto
               ? "Prueba cambiando los términos de búsqueda o quitando el filtro de \"Solo remoto\"."
-              : "Revisamos más de 7 portales continuamente. Las vacantes aparecerán pronto."}
+              : "Revisamos más de 7 portales en cuanto guardas tu perfil — esto toma unos minutos la primera vez. Vuelve a checar en un rato."}
           </p>
         </div>
       )}

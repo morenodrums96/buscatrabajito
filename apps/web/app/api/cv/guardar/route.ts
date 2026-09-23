@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
@@ -7,6 +8,7 @@ import { agregarHabilidadesAlCatalogo } from "@/lib/skillsCatalog";
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const db = DynamoDBDocumentClient.from(client);
+const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Mismo criterio que usaba el scraper antes de tener términos normalizados:
@@ -122,6 +124,23 @@ export async function POST(req: NextRequest) {
       }));
     })
   );
+
+  // Sin esto, un usuario que acaba de armar su perfil tenía que esperar
+  // hasta 30 min (la próxima corrida programada de EventBridge) para ver
+  // su primera vacante — mala primera impresión, sobre todo para alguien
+  // que acaba de pagar. Se dispara el scraper aparte (~5-6 min) en vez de
+  // esperar el ciclo normal. Async ("Event"): no bloquea la respuesta al
+  // usuario, y si ya hay una corrida en curso (concurrencia reservada en
+  // 1), Lambda reintenta la invocación sola con backoff.
+  if (Array.isArray(perfiles) && perfiles.length > 0) {
+    lambda
+      .send(new InvokeCommand({
+        FunctionName: "job-bot-scraper",
+        InvocationType: "Event",
+        Payload: Buffer.from("{}"),
+      }))
+      .catch((e) => console.error("Error disparando job-bot-scraper:", e));
+  }
 
   return NextResponse.json({ ok: true });
 }
