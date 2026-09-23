@@ -1,7 +1,7 @@
 """
 BuscoTrabajito — Scraper de vacantes multi-usuario
 Fuentes activas: OCC Mundial, LinkedIn Jobs, Computrabajo, Talenteca,
-                  Freelancer.com, OXXO, Coca-Cola FEMSA
+                  Freelancer.com, OXXO, Coca-Cola FEMSA, CEMEX
 Definidas pero inactivas (no están en la lista `scrapers` de main()):
                   Bumeran, Remotive, We Work Remotely, Himalayas
 
@@ -127,6 +127,62 @@ def parse_fecha_relativa(texto: str) -> str:
         return fecha.strftime("%Y-%m-%d")
 
     return ""
+
+
+MESES_ABREV_ES = {
+    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
+    "jul": 7, "ago": 8, "sept": 9, "sep": 9, "oct": 10, "nov": 11, "dic": 12,
+}
+
+
+def parse_fecha_cemex(texto: str) -> str:
+    """CEMEX (SuccessFactors) da la fecha como "18 sept 2026" (día, mes
+    abreviado en español, año) — formato distinto al relativo de OCC/
+    Computrabajo, necesita su propio parser."""
+    t = unicodedata.normalize("NFKD", texto.lower().strip()).encode("ascii", "ignore").decode()
+    m = re.match(r"(\d+)\s+([a-z]+)\.?\s+(\d{4})", t)
+    if not m:
+        return ""
+    dia, mes_txt, anio = m.group(1), m.group(2), m.group(3)
+    mes = MESES_ABREV_ES.get(mes_txt)
+    if not mes:
+        return ""
+    try:
+        return datetime(int(anio), mes, int(dia), tzinfo=timezone.utc).strftime("%Y-%m-%d")
+    except ValueError:
+        return ""
+
+
+CEMEX_ESTADOS = {
+    "agu": "Aguascalientes", "bcn": "Baja California", "bcs": "Baja California Sur",
+    "cam": "Campeche", "chp": "Chiapas", "chh": "Chihuahua", "cdmx": "Ciudad de México",
+    "coa": "Coahuila", "col": "Colima", "dur": "Durango", "gua": "Guanajuato",
+    "gro": "Guerrero", "hid": "Hidalgo", "jal": "Jalisco", "mex": "Estado de México",
+    "mic": "Michoacán", "mor": "Morelos", "nay": "Nayarit", "nle": "Nuevo León",
+    "oax": "Oaxaca", "pue": "Puebla", "que": "Querétaro", "roo": "Quintana Roo",
+    "slp": "San Luis Potosí", "sin": "Sinaloa", "son": "Sonora", "tab": "Tabasco",
+    "tam": "Tamaulipas", "tla": "Tlaxcala", "ver": "Veracruz", "yuc": "Yucatán",
+    "zac": "Zacatecas",
+}
+
+
+def normalizar_location_cemex(location: str) -> str:
+    """CEMEX da la ubicación como "Ciudad, ESTADO_ABREV, PAÍS, CP" (ej.
+    "San Luis Potosí, SLP, MX, 78378") — CEMEX opera también en EUA,
+    Francia, Colombia, etc., así que solo normaliza cuando el país es
+    México; el resto se deja tal cual (no va a matchear ningún estado,
+    igual que pasa hoy con otras fuentes internacionales).
+    Formato distinto al de OCC/Computrabajo ("Ciudad, Estado"), que es lo
+    que espera el matching por estado — se normaliza aquí, en el
+    scraper, en vez de tocar esa lógica (ya duplicada en dos lugares:
+    matching.py y route.ts).
+    """
+    partes = [p.strip() for p in location.split(",")]
+    if len(partes) < 3 or partes[2].strip().upper() != "MX":
+        return location
+    ciudad = partes[0]
+    estado = CEMEX_ESTADOS.get(partes[1].strip().lower(), partes[1].strip())
+    return f"{ciudad}, {estado}"
 
 
 def get_search_terms(max_terms: int = MAX_TERMS) -> list[str]:
@@ -847,6 +903,60 @@ def scrape_eightfold(terms: list[str], source_name: str, api_host: str, domain_p
     return jobs
 
 
+def scrape_cemex(terms: list[str]) -> list[dict]:
+    """CEMEX publica sus vacantes en un career site SAP SuccessFactors
+    propio (jobs.cemex.com) con búsqueda real por palabra clave — misma
+    familia de plataforma que se investigó para FEMSA Salud/Solistica,
+    pero con un tema/HTML distinto (tabla con columnas título/ubicación/
+    fecha, no requiere JS)."""
+    jobs      = []
+    keywords  = keywords_from_terms(terms)
+    RESULTS_PER_PAGE = 10
+    MAX_PAGES = 2
+    for term in terms:
+        for page in range(MAX_PAGES):
+            startrow = page * RESULTS_PER_PAGE
+            url = (
+                "https://jobs.cemex.com/search/"
+                f"?q={requests.utils.quote(term)}&locale=es_MX&startrow={startrow}"
+            )
+            r = safe_get(url)
+            if not r:
+                break
+            soup = BeautifulSoup(r.text, "html.parser")
+            rows = soup.select("tr.data-row")
+            if not rows:
+                break
+
+            for row in rows:
+                try:
+                    title_el = row.select_one("a.jobTitle-link")
+                    title    = title_el.get_text(strip=True) if title_el else ""
+                    if not title:
+                        continue
+
+                    href = title_el.get("href", "")
+                    link = href if href.startswith("http") else f"https://jobs.cemex.com{href}"
+
+                    loc_el   = row.select_one("td.colLocation span.jobLocation")
+                    location = normalizar_location_cemex(loc_el.get_text(strip=True)) if loc_el else "México"
+
+                    date_el     = row.select_one("td.colDate span.jobDate")
+                    posted_date = parse_fecha_cemex(date_el.get_text(strip=True)) if date_el else ""
+
+                    if is_relevant(title, location, keywords):
+                        jobs.append({"source": "CEMEX", "title": title, "company": "CEMEX",
+                                     "location": location, "link": link, "posted_date": posted_date,
+                                     "job_id": job_id(title, "CEMEX", location)})
+                except Exception as e:
+                    print(f"  CEMEX card error: {e}")
+
+            if len(rows) < RESULTS_PER_PAGE:
+                break
+    print(f"CEMEX: {len(jobs)} vacantes encontradas")
+    return jobs
+
+
 # ── Deduplicar ────────────────────────────────────────────────────
 def filter_new(jobs: list[dict], seen: set) -> list[dict]:
     new_jobs        = []
@@ -878,6 +988,7 @@ def main(event=None, context=None):
         ("Talenteca", lambda: scrape_talenteca(terms)),
         ("OXXO", lambda: scrape_eightfold(terms, "OXXO", "careers.oxxo.com", "oxxo.com")),
         ("Coca-Cola FEMSA", lambda: scrape_eightfold(terms, "Coca-Cola FEMSA", "coca-colafemsa.eightfold.ai", "coca-colafemsa.com")),
+        ("CEMEX", lambda: scrape_cemex(terms)),
     ]
 
     all_jobs = []
