@@ -74,14 +74,17 @@ const MOTIVOS_DESCARTE: { value: string; label: string }[] = [
 
 const UMBRAL_SUGERENCIA = 3;
 
-// Misma heurística que usa el matching real (palabras > 3 letras del
-// puesto que aparecen en el título) — así la sugerencia de "quita este
-// puesto de tus búsquedas" se basa en exactamente lo que causó los
-// matches que se estuvieron descartando.
+// Exige que coincida la MAYORÍA de las palabras del puesto, no solo una
+// — con "alguna" bastaba una palabra genérica como "Engineer" para
+// atribuir mal un descarte de "Mechanical Engineer" al perfil de
+// "Senior Software Engineer Fullstack" (comparten "Engineer" pero nada
+// más). Puestos de 1 palabra siguen necesitando esa única palabra.
 function perfilCoincideConVacante(vacante: Vacante, perfil: Perfil): boolean {
   const palabras = perfil.puesto.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  if (palabras.length === 0) return false;
   const title = vacante.title.toLowerCase();
-  return palabras.some((w) => title.includes(w));
+  const coincidencias = palabras.filter((w) => title.includes(w)).length;
+  return coincidencias * 2 > palabras.length;
 }
 
 const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
