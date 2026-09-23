@@ -107,6 +107,7 @@ const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }
   OXXO: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200" },
   "Coca-Cola FEMSA": { bg: "bg-pink-50", text: "text-pink-700", border: "border-pink-200" },
   CEMEX: { bg: "bg-lime-50", text: "text-lime-700", border: "border-lime-200" },
+  Ternium: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
 };
 
 const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
