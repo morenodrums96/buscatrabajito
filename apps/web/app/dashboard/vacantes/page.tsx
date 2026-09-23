@@ -108,6 +108,7 @@ const SOURCE_CONFIG: Record<string, { bg: string; text: string; border: string }
   "Coca-Cola FEMSA": { bg: "bg-pink-50", text: "text-pink-700", border: "border-pink-200" },
   CEMEX: { bg: "bg-lime-50", text: "text-lime-700", border: "border-lime-200" },
   Ternium: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
+  "Grupo Modelo": { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200" },
 };
 
 const FUENTES_INTERNACIONALES = new Set(["Freelancer"]);
