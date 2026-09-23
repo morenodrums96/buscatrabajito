@@ -291,12 +291,20 @@ def save_match(user_id: str, job: dict):
         Key={"PK": f"USER#{user_id}", "SK": f"JOB#{job['job_id']}"},
         UpdateExpression=(
             "SET job_id = :jid, title = :title, company = :company, "
-            "location = :location, link = :link, #src = :src, "
+            "#loc = :location, link = :link, #src = :src, "
             "posted_date = :posted_date, idioma = :idioma, "
             "tipo_empleo = :tipo_empleo, seen_at = :seen_at, "
             "notified = if_not_exists(notified, :notified_default)"
         ),
-        ExpressionAttributeNames={"#src": "source"},
+        # "location" y "source" son palabras reservadas en DynamoDB
+        # (ver ReservedWords.html) — sin alias, UpdateItem tira
+        # ValidationException y save_match crashea sin capturar el
+        # error, lo que mata toda la corrida de matching a medias
+        # (nunca llega a mandar los correos). Pasó justo eso: el fix
+        # anterior de put_item->update_item se probó sin escribir de
+        # verdad en DynamoDB, así que este bug no se detectó hasta
+        # producción.
+        ExpressionAttributeNames={"#src": "source", "#loc": "location"},
         ExpressionAttributeValues={
             ":jid": job["job_id"],
             ":title": job["title"],
@@ -400,7 +408,14 @@ def lambda_handler(event, context):
             if job_matches_profile(job, profile):
                 user_matches.setdefault(user_id, []).append(job)
                 matched_job_ids.setdefault(user_id, set()).add(job["job_id"])
-                save_match(user_id, job)
+                # No dejar que un solo fallo al guardar (throttle, item
+                # malformado, etc.) tumbe la corrida completa — ya pasó una
+                # vez y significa CERO correos para TODOS los usuarios de
+                # esa corrida, no solo el match que falló.
+                try:
+                    save_match(user_id, job)
+                except Exception as e:
+                    print(f"  Error guardando match ({user_id} / {job.get('job_id')}): {e}")
 
     print(f"[matching] matches para {len(user_matches)} usuarios")
 
