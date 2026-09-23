@@ -16,6 +16,8 @@ interface DashboardSidebarProps {
   pathname: string;
   isFreePlan: boolean;
   onSignOut: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 const NAV_ITEMS = [
@@ -29,13 +31,31 @@ export default function DashboardSidebar({
   pathname,
   isFreePlan,
   onSignOut,
+  isOpen,
+  onClose,
 }: DashboardSidebarProps) {
   return (
-    <aside className="w-64 bg-[#0B192C] text-white flex flex-col fixed top-0 left-0 bottom-0 z-40 border-r border-slate-800 select-none">
+    <>
+      {/* Fondo oscuro detrás del sidebar en móvil — clic afuera cierra.
+          Solo existe (y bloquea) cuando el sidebar está abierto. */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`w-64 bg-[#0B192C] text-white flex flex-col fixed top-0 left-0 bottom-0 z-40 border-r border-slate-800 select-none transition-transform duration-300 ease-out md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       {/* ── HEADER DEL BRAND ── */}
       <div className="h-16 flex items-center px-6 border-b border-slate-800/80">
         <Link
           href="/"
+          onClick={onClose}
           className="group flex items-center gap-3 transition-all duration-300"
         >
           <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-[#1E40AF] via-[#2563EB] to-[#60A5FA] p-0.5 shadow-md shadow-blue-500/20 group-hover:scale-105 group-hover:shadow-blue-500/30 transition-all duration-300">
@@ -67,6 +87,7 @@ export default function DashboardSidebar({
               key={item.href}
               href={item.href}
               data-tour={item.tour}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                 active
                   ? "bg-[#2563EB]/20 text-white border-l-4 border-[#3B82F6] pl-3 shadow-inner"
@@ -122,6 +143,7 @@ export default function DashboardSidebar({
           </span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

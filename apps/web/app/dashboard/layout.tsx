@@ -25,6 +25,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Al navegar a otra sección, cierra el drawer del sidebar en móvil —
+  // si no, se queda abierto tapando la página nueva.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -95,14 +102,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         pathname={pathname}
         isFreePlan={plan === "free"}
         onSignOut={handleSignOut}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <DashboardHeader
         displayName={displayName}
         planLabel={PLAN_LABELS[plan] ?? plan.toUpperCase()}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
       />
 
-      <main className="ml-64 flex-1 p-8 space-y-6 max-w-7xl">
+      <main className="md:ml-64 flex-1 p-4 md:p-8 space-y-6 max-w-7xl">
         <AnimatePresence mode="wait">
           {showSpinner ? (
             <motion.div
