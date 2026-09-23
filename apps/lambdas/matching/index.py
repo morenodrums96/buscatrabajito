@@ -116,11 +116,28 @@ def job_matches_profile(job: dict, profile: dict) -> bool:
     # LinkedIn — sin incluirlas aquí, un puesto en español nunca hace
     # match contra títulos en inglés aunque el scraper sí haya
     # encontrado la vacante correcta con esos mismos términos.
+    #
+    # Cada frase se evalúa POR SEPARADO exigiendo que coincida la mayoría
+    # de sus palabras (>3 letras) — no que aparezca UNA sola palabra del
+    # conjunto de todas las frases juntas. Antes bastaba con que "Engineer"
+    # apareciera para hacer match, y así "Senior Software Engineer
+    # Fullstack" emparejaba con "Mechanical Design Engineer" sin relación
+    # real. No se puede exigir mayoría sobre el conjunto completo porque
+    # las frases son variantes alternativas del mismo puesto (a veces en
+    # otro idioma), no modificadores de una sola frase — casi nunca
+    # comparten palabras entre sí.
     frases = [puesto] + [t.lower() for t in terminos_busqueda]
-    puesto_words = {w for frase in frases for w in frase.split() if len(w) > 3}
-    title_match = any(word in job_title for word in puesto_words)
 
-    print(f"  puesto={puesto} | terminos_busqueda={terminos_busqueda} | title={job_title} | words={puesto_words} | title_match={title_match}")
+    def frase_coincide(frase: str) -> bool:
+        palabras = [w for w in frase.split() if len(w) > 3]
+        if not palabras:
+            return False
+        coincidencias = sum(1 for w in palabras if w in job_title)
+        return coincidencias * 2 > len(palabras)
+
+    title_match = any(frase_coincide(f) for f in frases)
+
+    print(f"  puesto={puesto} | terminos_busqueda={terminos_busqueda} | title={job_title} | title_match={title_match}")
     
     if not title_match:
         return False
